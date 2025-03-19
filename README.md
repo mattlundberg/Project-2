@@ -13,19 +13,20 @@ Join our Slack channel for project discussions and updates:
 
  ## Todo List
  [Git Project Board](LINK HERE)
+ 
  ## Project Milestones
 
 | Milestone | Due Date | Status |
 |----------|----------|----------|
-| Project Ideation | TBD | In Progress |
-| Git Project Creation | TBD | To Do |
-| Data Fetching | TBD | To Do |
-| Data Exploration | TBD | To Do |
-| Data Transformation | TBD | To Do |
-| Data Analysis | TBD | To Do |
+| Project Ideation | 3/18/25 | Complete |
+| Git Project Creation | 3/18/25 | Complete |
+| Data Fetching | 3/18/25 | To Do |
+| Data Exploration | 3/20/25 | To Do |
+| Data Transformation | 3/20/25 | To Do |
+| Data Analysis | 3/25/25 | To Do |
 | Testing | Ad Hoc | To Do |
-| Create Documentation | TBD | To Do |
-| Create Presentation | TBD | To Do |
+| Create Documentation | 3/27/25 | To Do |
+| Create Presentation | 3/27/25 | To Do |
 
  ## Proposal
   TBD
