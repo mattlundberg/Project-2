@@ -31,6 +31,7 @@ api_fetcher.log
 
 # Data directory
 data/
+resources/
 
 # IDE
 .idea/
