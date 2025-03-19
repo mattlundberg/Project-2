@@ -7,6 +7,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.svm import SVC, SVR
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, mean_squared_error, r2_score
 import logging
 from typing import Union, Tuple, Optional, Dict, Any
@@ -163,13 +164,15 @@ class ModelHelper:
             models = {
                 'random_forest': RandomForestClassifier(random_state=self.random_state),
                 'logistic_regression': LogisticRegression(random_state=self.random_state),
-                'svm': SVC(random_state=self.random_state)
+                'svm': SVC(random_state=self.random_state),
+                'decision_tree': DecisionTreeClassifier(random_state=self.random_state)
             }
         else:
             models = {
                 'random_forest': RandomForestRegressor(random_state=self.random_state),
                 'linear_regression': LinearRegression(),
-                'svr': SVR()
+                'svr': SVR(),
+                'decision_tree': DecisionTreeRegressor(random_state=self.random_state)
             }
         
         if model_type not in models:
