@@ -1,4 +1,4 @@
-# Project-1 Myth Busting
+# Project-2 
 ## Slack Channel
 Join our Slack channel for project discussions and updates:
 - Channel: #404-not-found
@@ -13,6 +13,7 @@ Join our Slack channel for project discussions and updates:
 
  ## Todo List
  [Git Project Board](LINK HERE)
+ 
  ## Project Milestones
 
 | Milestone | Due Date | Status |
