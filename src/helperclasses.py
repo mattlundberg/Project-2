@@ -84,11 +84,12 @@ class DataFetcherNOAA:
         if self.noaaData is None:
             print("Fetching NOAA data from NOAA API...")
             response = requests.get(
-                f"https://www.ncdc.noaa.gov/cdo-web/api/v2/data?datasetid=GHCND&startdate=2021-06-01&enddate=2023-12-31&limit=1000",
-                headers={"token": self.noaa_api_key}
+                f"https://www.ncei.noaa.gov/cdo-web/api/v2/data?datasetid=GHCND&locationid=ZIP:84116&startdate=2025-01-01&enddate=2025-01-01",
+                headers={"token": 'bjJHSvSZxSmURbGZiokSEwfqFjPTpsUQ', "Content-Type": "application/json"}
             )
             
             # Check if request was successful
+            print(response)
             response.raise_for_status()
             
             # Convert JSON response to DataFrame directly from the results list
