@@ -17,7 +17,7 @@ Join our Slack channel for project discussions and updates:
 |----------|----------|----------|
 | Project Ideation | 3/18/25 | Complete |
 | Data Fetching | 3/20/25 | In Progress |
-| Data Exploration | 3/24/25 | To Do |
+| Data Exploration & Clean Up | 3/24/25 | To Do |
 | Model Selection | 3/25/25 | To Do |
 | Model/UI Connection | 3/25/25 | To Do |
 | Testing | Ad Hoc | In Progress |
