@@ -16,27 +16,28 @@ Join our Slack channel for project discussions and updates:
  
  ## Project Milestones
 
-
 | Milestone | Due Date | Status |
 |----------|----------|----------|
-| Project Ideation | TBD | In Progress |
-| Git Project Creation | TBD | To Do |
-| Data Fetching | TBD | In Progress |
-| Data Exploration | TBD | To Do |
-| Data Transformation | TBD | To Do |
-| Data Analysis | TBD | To Do |
+| Project Ideation | 3/18/25 | Complete |
+| Data Fetching | 3/20/25 | In Progress |
+| Data Exploration | 3/24/25 | To Do |
+| Model Selection | 3/25/25 | To Do |
+| Model/UI Connection | 3/25/25 | To Do |
 | Testing | Ad Hoc | In Progress |
-| Create Documentation | TBD | To Do |
-| Create Presentation | TBD | To Do |
+| Finalize Documentation | 3/27/25 | To Do |
+| Create Presentation | 3/27/25 | To Do |
 
 ## Proposal
-TBD
+Air travel: where the thrill of soaring 35,000 feet in the air is matched only by the agony of waiting on the ground for your delayed flight. It's like being a contestant in a real-life game of "Will I Make My Connection?"—except instead of prizes, you win stress and a possible overnight stay in an airport lounge.
+
+Our proposal is to create a machine learning model that helps you predict whether your flight will be delayed. By feeding it four crucial pieces of information—date, origin, destination, and airline— our model will give you a heads-up on whether you should start practicing your "I'm stuck in the airport" face or if you'll actually make it to your destination on time.
 
 ## Slide Deck
 TBD
 
 ## Data sets
-Here is the link to get the airline delayed/cancelled data https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGJ&QO_fu146_anzr=b0-gvzr
+[Weather Data](https://www.ncdc.noaa.gov/cdo-web/webservices/v2#gettingStarted)
+[Airplane Data](https://www.kaggle.com/datasets/patrickzel/flight-delay-and-cancellation-dataset-2019-2023)
 
 # Program Information 
 ## Program Information
