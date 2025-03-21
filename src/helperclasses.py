@@ -2,6 +2,7 @@ import kagglehub
 import kagglehub.auth
 import pandas as pd
 import os
+import requests
 from modelhelper import ModelHelper
 from dotenv import load_dotenv
 from typing import Tuple
@@ -63,3 +64,45 @@ class DataFetcherKAGGLE:
 
         # Load dataset
         return pd.read_csv(path, engine='python')
+    
+class DataFetcherNOAA:
+    """
+    A class for fetching data from NOAA datasets using NOAA API.
+    """
+    
+    def __init__(self):
+        self.noaaData = None
+        self.noaa_api_key = 'bjJHSvSZxSmURbGZiokSEwfqFjPTpsUQ'
+
+    def fetch_noaa_data(self) -> pd.DataFrame:
+        """
+        Fetch NOAA data from NOAA API.
+        
+        Returns:
+            pd.DataFrame: Weather data from NOAA
+        """
+        if self.noaaData is None:
+            print("Fetching NOAA data from NOAA API...")
+            response = requests.get(
+                f"https://www.ncdc.noaa.gov/cdo-web/api/v2/data?datasetid=GHCND&startdate=2021-06-01&enddate=2023-12-31&limit=1000",
+                headers={"token": self.noaa_api_key}
+            )
+            
+            # Check if request was successful
+            response.raise_for_status()
+            
+            # Convert JSON response to DataFrame directly from the results list
+            self.noaaData = pd.DataFrame(response.json()['results'])
+            
+            # Convert date column to datetime
+            if 'date' in self.noaaData.columns:
+                self.noaaData['date'] = pd.to_datetime(self.noaaData['date'])
+
+        return self.noaaData
+
+    def clear_noaa_data(self):
+        """
+        Clear NOAA data.
+        """
+        self.noaaData = None
+

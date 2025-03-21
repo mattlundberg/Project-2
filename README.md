@@ -39,6 +39,13 @@ TBD
 
 ## Future Research Questions and Issues
 - During development, we discovered a gap in our Airplane Data for the year 2024. After assessing the situation, we determined that incorporating this missing data would exceed our project timeline. For future iterations, we recommend including the 2024 data to ensure the model is trained on the most current and comprehensive information available. This update would enhance the accuracy and reliability of our predictions. 
+Here is the link to get the airline delayed/cancelled data
+- https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGJ&QO_fu146_anzr=b0-gvzr
+- https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGJ&QO_fu146_anzr=b0-gvzr
+
+https://www.ncdc.noaa.gov API: 
+- email: matthew.d.lundberg
+- token: bjJHSvSZxSmURbGZiokSEwfqFjPTpsUQ
 
 # Program Information 
 ## Program Information
