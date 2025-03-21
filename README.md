@@ -1,4 +1,4 @@
-# Project 2
+# Project-2 
 ## Slack Channel
 Join our Slack channel for project discussions and updates:
 - Channel: #404-not-found
@@ -11,10 +11,11 @@ Join our Slack channel for project discussions and updates:
 - Jason Smoody
 - Erin, Spencer-Priebe 
 
-## Todo List
-[Git Project Board](LINK HERE)
+ ## Todo List
+ [Git Project Board](LINK HERE)
+ 
+ ## Project Milestones
 
-## Project Milestones
 
 | Milestone | Due Date | Status |
 |----------|----------|----------|
