@@ -10,9 +10,6 @@ Join our Slack channel for project discussions and updates:
 - Matthew Lundberg
 - Jason Smoody
 - Erin, Spencer-Priebe 
-
- ## Todo List
- [Git Project Board](LINK HERE)
  
  ## Project Milestones
 
