@@ -52,10 +52,6 @@ class DataFetcherKAGGLE:
         # Load environment variables
         load_dotenv()
         
-        # Set Kaggle credentials
-        os.environ['KAGGLE_USERNAME'] = 'matthewlundberg'
-        os.environ['KAGGLE_KEY'] = 'a879198a80d0e04e423e703539a74851'
-        
         # Download latest version
         path = kagglehub.dataset_download(
             file_path
@@ -72,7 +68,7 @@ class DataFetcherNOAA:
     
     def __init__(self):
         self.noaaData = None
-        self.noaa_api_key = 'bjJHSvSZxSmURbGZiokSEwfqFjPTpsUQ'
+        self.noaa_api_key = os.environ['NOAA_API_KEY']
 
     def fetch_noaa_data(self) -> pd.DataFrame:
         """
@@ -85,7 +81,7 @@ class DataFetcherNOAA:
             print("Fetching NOAA data from NOAA API...")
             response = requests.get(
                 f"https://www.ncei.noaa.gov/cdo-web/api/v2/data?datasetid=GHCND&locationid=ZIP:84116&startdate=2025-01-01&enddate=2025-01-01",
-                headers={"token": 'bjJHSvSZxSmURbGZiokSEwfqFjPTpsUQ', "Content-Type": "application/json"}
+                headers={"token": self.noaa_api_key, "Content-Type": "application/json"}
             )
             
             # Check if request was successful
