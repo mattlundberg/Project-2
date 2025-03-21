@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.svm import SVC, SVR
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, mean_squared_error, r2_score
 import logging
 from typing import Union, Tuple, Optional, Dict, Any
@@ -162,13 +164,15 @@ class ModelHelper:
             models = {
                 'random_forest': RandomForestClassifier(random_state=self.random_state),
                 'logistic_regression': LogisticRegression(random_state=self.random_state),
-                'svm': SVC(random_state=self.random_state)
+                'svm': SVC(random_state=self.random_state),
+                'decision_tree': DecisionTreeClassifier(random_state=self.random_state)
             }
         else:
             models = {
                 'random_forest': RandomForestRegressor(random_state=self.random_state),
                 'linear_regression': LinearRegression(),
-                'svr': SVR()
+                'svr': SVR(),
+                'decision_tree': DecisionTreeRegressor(random_state=self.random_state)
             }
         
         if model_type not in models:
@@ -224,3 +228,58 @@ class ModelHelper:
             np.ndarray: Predictions
         """
         return model.predict(X)
+
+    def optimize_flight_dataset_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Optimize data types for the flight dataset.
+        
+        Args:
+            df (pd.DataFrame): Input DataFrame
+            
+        Returns:
+            pd.DataFrame: DataFrame with optimized data types
+        """
+        # Convert date columns
+        date_columns = ['FL_DATE']
+        for col in date_columns:
+            df[col] = pd.to_datetime(df[col])
+        
+        # Convert time columns
+        time_columns = ['CRS_DEP_TIME', 'DEP_TIME', 'WHEELS_OFF', 'WHEELS_ON', 
+                       'CRS_ARR_TIME', 'ARR_TIME']
+        for col in time_columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Convert delay columns to float
+        delay_columns = ['DEP_DELAY', 'ARR_DELAY', 'DELAY_DUE_CARRIER', 
+                        'DELAY_DUE_WEATHER', 'DELAY_DUE_NAS', 
+                        'DELAY_DUE_SECURITY', 'DELAY_DUE_LATE_AIRCRAFT']
+        for col in delay_columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Convert boolean columns
+        boolean_columns = ['CANCELLED', 'DIVERTED']
+        for col in boolean_columns:
+            df[col] = df[col].astype(bool)
+        
+        # Convert categorical columns
+        categorical_columns = ['AIRLINE', 'AIRLINE_DOT', 'AIRLINE_CODE', 'DOT_CODE',
+                             'ORIGIN', 'ORIGIN_CITY', 'DEST', 'DEST_CITY']
+        for col in categorical_columns:
+            df[col] = df[col].astype('category')
+        
+        # Convert numeric columns
+        numeric_columns = ['FL_NUMBER', 'TAXI_OUT', 'TAXI_IN', 'CRS_ELAPSED_TIME',
+                          'ELAPSED_TIME', 'AIR_TIME', 'DISTANCE']
+        for col in numeric_columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        return df
+    
+    def prepare_flight_dataset(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Prepare the flight dataset for modeling.
+        """
+        print("Optimizing flight dataset data types...")
+        df = self.optimize_flight_dataset_dtypes(df)
+        return df
