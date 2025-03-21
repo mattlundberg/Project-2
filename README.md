@@ -1,4 +1,4 @@
-# Project-2 
+# Project-2: Ready? Set? Wait.
 ## Slack Channel
 Join our Slack channel for project discussions and updates:
 - Channel: #404-not-found
