@@ -29,7 +29,6 @@ def predict_flight():
     prediction = your_ml_model.predict(airline, departure_date, origin, destination)
 
     # Update result labels
-    arrival_time_label.config(text=f"Predicted Arrival Time: {prediction['arrival_time']}")
     delay_prob_label.config(text=f"Delay Probability: {prediction['delay_probability']:.2f}%")
 
 # Create main window
@@ -60,7 +59,6 @@ destination_combobox.set("Select destination airport")  # Set default text
 predict_button = ttk.Button(root, text="Predict Flight", command=predict_flight)
 
 # Create result labels
-arrival_time_label = ttk.Label(root, text="Predicted Arrival Time: ")
 delay_prob_label = ttk.Label(root, text="Delay Probability: ")
 
 # Layout widgets
@@ -78,7 +76,6 @@ destination_combobox.grid(row=3, column=1, padx=5, pady=5)
 
 predict_button.grid(row=4, column=0, columnspan=2, padx=5, pady=10)
 
-arrival_time_label.grid(row=5, column=0, columnspan=2, padx=5, pady=5)
-delay_prob_label.grid(row=6, column=0, columnspan=2, padx=5, pady=5)
+delay_prob_label.grid(row=5, column=0, columnspan=2, padx=5, pady=5)
 
 root.mainloop()
