@@ -239,10 +239,15 @@ class ModelHelper:
         Returns:
             pd.DataFrame: DataFrame with optimized data types
         """
+        # Remove records before June 15, 2021
+        cutoff_date = pd.to_datetime('2022-01-01')
+        df = df[pd.to_datetime(df['FL_DATE']) >= cutoff_date]
+
+        
         # Convert date columns
         date_columns = ['FL_DATE']
         for col in date_columns:
-            df[col] = pd.to_datetime(df[col])
+            df[col] = pd.to_numeric(pd.to_datetime(df[col]).astype(np.int64))
         
         # Convert time columns
         time_columns = ['CRS_DEP_TIME', 'DEP_TIME', 'WHEELS_OFF', 'WHEELS_ON', 
@@ -264,7 +269,7 @@ class ModelHelper:
         
         # Convert categorical columns
         categorical_columns = ['AIRLINE', 'AIRLINE_DOT', 'AIRLINE_CODE', 'DOT_CODE',
-                             'ORIGIN', 'ORIGIN_CITY', 'DEST', 'DEST_CITY']
+                             'ORIGIN', 'ORIGIN_CITY', 'DEST', 'DEST_CITY', 'CANCELLATION_CODE']
         for col in categorical_columns:
             df[col] = df[col].astype('category')
         
