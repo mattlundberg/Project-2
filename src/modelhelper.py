@@ -239,8 +239,12 @@ class ModelHelper:
         Returns:
             pd.DataFrame: DataFrame with optimized data types
         """
+        # Get the top 5 airlines by frequency
+        top_airlines = ['Southwest Airlines Co.', 'American Airlines Inc.', 'Delta Air Lines Inc.', 'Spirit Air Lines', 'Allegiant Air']
+        df = df[df['AIRLINE'].isin(top_airlines)]
+        
         # Remove records before June 15, 2021
-        cutoff_date = pd.to_datetime('2022-01-01')
+        cutoff_date = pd.to_datetime('2023-01-01')
         df = df[pd.to_datetime(df['FL_DATE']) >= cutoff_date]
 
         
