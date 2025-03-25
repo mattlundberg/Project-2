@@ -38,7 +38,6 @@ class DataFetcherKAGGLE:
         print("Preparing flight dataset...")
         modelHelper = ModelHelper()
         df_optmized = modelHelper.prepare_flight_dataset(df)
-
         
         return df_optmized
 
@@ -60,6 +59,12 @@ class DataFetcherKAGGLE:
 
         # Load dataset
         return pd.read_csv(path, engine='python')
+
+    def clear_flight_data(self):
+        """
+        Clear flight data.
+        """
+        self.flightData = None
     
 class DataFetcherNOAA:
     """
@@ -103,18 +108,29 @@ class DataFetcherNOAA:
         """
         self.noaaData = None
 
-    def clear_flight_data(self):
-        """
-        Clear flight data.
-        """
-        self.flightData = None
+class DataFetcherAirportData:
+    """
+    A class for fetching airport data from a CSV file.
+    """
 
-    def drop_columns(self,df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    def __init__(self):
+        self.airportData = None
+    
+    def fetch_airport_data(self) -> pd.DataFrame:
+        """
+        Fetch airport data from a CSV file.
+        """
+        return pd.read_csv('../airports.csv')
+
+class DataFrameHelper:
+    """
+    A class for helping with pandas DataFrames.
+    """
+
+    def drop_columns(self, df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
         """
         Remove columns from a dataframe.
         """
         df = df.drop(columns=columns)
 
         return df
-
-
