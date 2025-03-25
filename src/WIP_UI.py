@@ -23,10 +23,9 @@ def predict_flight():
     airline = airline_combobox.get()
     departure_date = departure_date_cal.get_date()
     origin = origin_combobox.get()
-    destination = destination_combobox.get()
 
     # Call your ML model's prediction function
-    prediction = your_ml_model.predict(airline, departure_date, origin, destination)
+    prediction = your_ml_model.predict(airline, departure_date, origin)
 
     # Update result labels
     delay_prob_label.config(text=f"Delay Probability: {prediction['delay_probability']:.2f}%")
@@ -51,10 +50,6 @@ origin_label = ttk.Label(root, text="Origin Airport:")
 origin_combobox = ttk.Combobox(root, values=airports, state="readonly")
 origin_combobox.set("Select origin airport")  # Set default text
 
-destination_label = ttk.Label(root, text="Destination Airport:")
-destination_combobox = ttk.Combobox(root, values=airports, state="readonly")
-destination_combobox.set("Select destination airport")  # Set default text
-
 # Create predict button
 predict_button = ttk.Button(root, text="Predict Flight", command=predict_flight)
 
@@ -71,10 +66,7 @@ departure_date_cal.grid(row=1, column=1, padx=5, pady=5)
 origin_label.grid(row=2, column=0, padx=5, pady=5, sticky="e")
 origin_combobox.grid(row=2, column=1, padx=5, pady=5)
 
-destination_label.grid(row=3, column=0, padx=5, pady=5, sticky="e")
-destination_combobox.grid(row=3, column=1, padx=5, pady=5)
-
-predict_button.grid(row=4, column=0, columnspan=2, padx=5, pady=10)
+predict_button.grid(row=3, column=0, columnspan=2, padx=5, pady=10)
 
 delay_prob_label.grid(row=5, column=0, columnspan=2, padx=5, pady=5)
 
