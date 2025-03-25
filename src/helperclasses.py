@@ -65,63 +65,7 @@ class DataFetcherKAGGLE:
         Clear flight data.
         """
         self.flightData = None
-    
-class DataFetcherNOAA:
-    """
-    A class for fetching data from NOAA datasets using NOAA API.
-    """
-    
-    def __init__(self):
-        self.noaaData = None
-        self.noaa_api_key = os.environ['NOAA_API_KEY']
-
-    def fetch_noaa_data(self) -> pd.DataFrame:
-        """
-        Fetch NOAA data from NOAA API.
         
-        Returns:
-            pd.DataFrame: Weather data from NOAA
-        """
-        if self.noaaData is None:
-            print("Fetching NOAA data from NOAA API...")
-            response = requests.get(
-                f"https://www.ncei.noaa.gov/cdo-web/api/v2/data?datasetid=GHCND&locationid=ZIP:84116&startdate=2025-01-01&enddate=2025-01-01",
-                headers={"token": self.noaa_api_key, "Content-Type": "application/json"}
-            )
-            
-            # Check if request was successful
-            print(response)
-            response.raise_for_status()
-            
-            # Convert JSON response to DataFrame directly from the results list
-            self.noaaData = pd.DataFrame(response.json()['results'])
-            
-            # Convert date column to datetime
-            if 'date' in self.noaaData.columns:
-                self.noaaData['date'] = pd.to_datetime(self.noaaData['date'])
-
-        return self.noaaData
-
-    def clear_noaa_data(self):
-        """
-        Clear NOAA data.
-        """
-        self.noaaData = None
-
-class DataFetcherAirportData:
-    """
-    A class for fetching airport data from a CSV file.
-    """
-
-    def __init__(self):
-        self.airportData = None
-    
-    def fetch_airport_data(self) -> pd.DataFrame:
-        """
-        Fetch airport data from a CSV file.
-        """
-        return pd.read_csv('../airports.csv')
-
 class DataFrameHelper:
     """
     A class for helping with pandas DataFrames.
