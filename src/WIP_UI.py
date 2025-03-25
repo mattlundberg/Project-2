@@ -1,14 +1,22 @@
 import tkinter as tk
 from tkinter import ttk
 from tkcalendar import DateEntry
-from datetime import datetime, timedelta
+import pandas as pd
+from datetime import datetime
+from datetime import timedelta
+from helperclasses import DataFetcherKAGGLE
 #import your_ml_model  # Import your ML model here
 
-# List of available airlines
-airlines = ['American Airlines', 'Delta Air Lines', 'United Airlines', 'Southwest Airlines', 'JetBlue Airways']
+# Load airports from CSV
+airport_df = pd.read_csv('airports.csv')
+airports = airport_df['AIRPORT'].tolist()
 
-# List of airports
-airports = ['ATL', 'LAX', 'ORD', 'DFW', 'DEN', 'JFK', 'SFO', 'SEA', 'LAS', 'MCO', 'EWR', 'CLT', 'PHX', 'IAH', 'MIA']
+#Load airlines data from Kaggle
+# data_fetcher = DataFetcherKAGGLE()
+# flight_data = data_fetcher.fetch_flight_dataset()
+# airlines_demo = flight_data['AIRLINE'].unique().tolist()
+
+airlines = ['American Airlines', 'Delta Air Lines', 'United Airlines', 'Southwest Airlines', 'JetBlue Airways']
 
 def predict_flight():
     # Get input values from GUI
