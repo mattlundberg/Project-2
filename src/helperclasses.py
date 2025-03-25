@@ -103,3 +103,18 @@ class DataFetcherNOAA:
         """
         self.noaaData = None
 
+    def clear_flight_data(self):
+        """
+        Clear flight data.
+        """
+        self.flightData = None
+
+    def drop_columns(self,df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+        """
+        Remove columns from a dataframe.
+        """
+        df = df.drop(columns=columns)
+
+        return df
+
+
