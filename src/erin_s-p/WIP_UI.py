@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from tkcalendar import DateEntry
-from datetime import datetime
+from datetime import datetime, timedelta
 #import your_ml_model  # Import your ML model here
 
 # List of available airlines
@@ -35,7 +35,10 @@ airline_combobox.set("Select an airline")  # Set default text
 
 departure_date_label = ttk.Label(root, text="Departure Date:")
 departure_date_cal = DateEntry(root, width=12, background='darkblue',
-                               foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
+                               foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd',
+                               mindate=datetime.today(),
+                               maxdate=datetime.today() + timedelta(days=60))  # Restrict to next 60 days
+departure_date_cal.set_date(datetime.today().strftime('%Y-%m-%d'))  # Set initial date to today
 
 origin_label = ttk.Label(root, text="Origin Airport:")
 origin_combobox = ttk.Combobox(root, values=airports, state="readonly")
