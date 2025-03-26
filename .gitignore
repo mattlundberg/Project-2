@@ -32,6 +32,7 @@ api_fetcher.log
 # Data directory
 data/
 resources/
+models/
 
 # IDE
 .idea/

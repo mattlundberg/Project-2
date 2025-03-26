@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
@@ -165,7 +166,14 @@ class ModelHelper:
                 'random_forest': RandomForestClassifier(random_state=self.random_state),
                 'logistic_regression': LogisticRegression(random_state=self.random_state),
                 'svm': SVC(random_state=self.random_state),
-                'decision_tree': DecisionTreeClassifier(random_state=self.random_state)
+                'decision_tree': DecisionTreeClassifier(
+                    random_state=self.random_state,
+                    max_depth=10,  # Limit tree depth to prevent overfitting
+                    min_samples_split=5,  # Minimum samples required to split
+                    min_samples_leaf=2,  # Minimum samples in leaf nodes
+                    class_weight='balanced',  # Handle class imbalance
+                    criterion='gini'  # Use Gini impurity for classification
+                )
             }
         else:
             models = {
@@ -251,7 +259,7 @@ class ModelHelper:
         # Convert date columns
         date_columns = ['FL_DATE']
         for col in date_columns:
-            df[col] = pd.to_numeric(pd.to_datetime(df[col]).astype(np.int64))
+            df[col] = pd.to_datetime(df[col], errors='coerce')
         
         # Convert time columns
         time_columns = ['CRS_DEP_TIME', 'DEP_TIME', 'WHEELS_OFF', 'WHEELS_ON', 
@@ -282,6 +290,9 @@ class ModelHelper:
                           'ELAPSED_TIME', 'AIR_TIME', 'DISTANCE']
         for col in numeric_columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        delay_columns = ['DELAY_DUE_CARRIER', 'DELAY_DUE_WEATHER', 'DELAY_DUE_NAS', 'DELAY_DUE_SECURITY', 'DELAY_DUE_LATE_AIRCRAFT']
+        df[delay_columns] = df[delay_columns].fillna(0)
         
         return df
     
@@ -291,4 +302,136 @@ class ModelHelper:
         """
         print("Optimizing flight dataset data types...")
         df = self.optimize_flight_dataset_dtypes(df)
+
+        # Drop columns not needed for modeling
+        columns_to_drop = [
+            'AIRLINE_DOT',    # Redundant airline identifier
+            'AIRLINE_CODE',   # Redundant airline identifier  
+            'DOT_CODE',       # Redundant airline identifier
+            'FL_NUMBER',      # Flight number not predictive
+            'CRS_DEP_TIME',   # Will extract hour instead
+            'TAXI_OUT',       # Not available at prediction time
+            'WHEELS_OFF',     # Not available at prediction time  
+            'WHEELS_ON',      # Not available at prediction time
+            'TAXI_IN',        # Not available at prediction time
+            'CRS_ARR_TIME',   # Not needed for departure delay prediction
+            'ARR_TIME',       # Not available at prediction time
+            'ARR_DELAY',      # Not available at prediction time
+            'CRS_ELAPSED_TIME', # Will use distance instead
+            'AIR_TIME',       # Not available at prediction time
+            'DISTANCE',       # Keeping for route complexity calculation
+            'DEST',          # Using DEST_CITY instead
+            'DEST_CITY',     # Destination may affect delays
+            'ELAPSED_TIME',  # Not available at prediction time
+            'DEP_TIME',      # Not available at prediction time
+            'ORIGIN_CITY',   # Origin may affect delays
+            'CANCELLED',     # Not predicting cancellations
+            'CANCELLATION_CODE', # Not predicting cancellations
+            'DIVERTED'       # Not predicting diversions
+        ]
+        df = df.drop(columns=columns_to_drop)
+        
+        # Feature Engineering
+        print("Performing feature engineering...")
+        
+        # Create time-based features from scheduled departure time
+        df['DAY_OF_WEEK'] = pd.to_datetime(df['FL_DATE']).dt.dayofweek
+        
+        # Create delay categories based on departure delay
+        df['DELAY_CATEGORY'] = pd.cut(df['DEP_DELAY'], 
+                                    bins=[-np.inf, -15, 15, np.inf],
+                                    labels=['Early', 'On Time', 'Delayed'])
+        
+        # Create total delay feature from all delay types
+        delay_columns = ['DELAY_DUE_CARRIER', 'DELAY_DUE_WEATHER', 
+                        'DELAY_DUE_NAS', 'DELAY_DUE_SECURITY', 
+                        'DELAY_DUE_LATE_AIRCRAFT']
+        df['TOTAL_DELAY'] = df[delay_columns].sum(axis=1)
+        
+        # Handle class imbalance for delay categories
+        print("Handling class imbalance...")
+        delay_counts = df['DELAY_CATEGORY'].value_counts()
+        
+        # Check if we have any data
+        if len(delay_counts) == 0:
+            raise ValueError("No data available after preprocessing")
+            
+        max_delay = delay_counts.max()
+        
+        # Balance the dataset using oversampling
+        balanced_dfs = []
+        for category in df['DELAY_CATEGORY'].unique():
+            category_df = df[df['DELAY_CATEGORY'] == category]
+            if len(category_df) > 0:  # Only process non-empty categories
+                if len(category_df) < max_delay:
+                    # Oversample minority classes
+                    category_df = category_df.sample(n=max_delay, replace=True, random_state=self.random_state)
+                balanced_dfs.append(category_df)
+        
+        if not balanced_dfs:
+            raise ValueError("No valid data categories found after balancing")
+            
+        df = pd.concat(balanced_dfs)
+        
+        # Drop remaining columns not needed for modeling
+        final_columns_to_drop = ['FL_DATE'] + delay_columns
+        df = df.drop(columns=final_columns_to_drop, errors='ignore')
+        
         return df
+
+    def save_model(self, model: Any, model_name: str) -> None:
+        """
+        Save a trained model to the models directory.
+        
+        Args:
+            model (Any): Trained model object to save
+            model_name (str): Name to give the saved model file
+        """
+        import os
+        
+        # Create models directory if it doesn't exist
+        os.makedirs('models', exist_ok=True)
+        
+        # Add .pkl extension if not provided
+        if not model_name.endswith('.pkl'):
+            model_name += '.pkl'
+            
+        model_path = os.path.join('models', model_name)
+        
+        try:
+            with open(model_path, 'wb') as f:
+                pickle.dump(model, f)
+            self.logger.info(f"Model successfully saved to {model_path}")
+        except Exception as e:
+            self.logger.error(f"Error saving model to {model_path}: {str(e)}")
+            raise
+
+    def load_model(self, model_name: str) -> Any:
+        """
+        Load a saved model from the models directory.
+        
+        Args:
+            model_name (str): Name of the saved model file
+            
+        Returns:
+            Any: Loaded model object
+        """ 
+        import os
+
+        # Create models directory if it doesn't exist
+        os.makedirs('models', exist_ok=True)    
+
+        # Add .pkl extension if not provided
+        if not model_name.endswith('.pkl'):
+            model_name += '.pkl'
+
+        model_path = os.path.join('models', model_name) 
+
+        try:
+            with open(model_path, 'rb') as f:
+                model = pickle.load(f)
+            self.logger.info(f"Model successfully loaded from {model_path}")
+            return model        
+        except Exception as e:
+            self.logger.error(f"Error loading model from {model_path}: {str(e)}")
+            raise      
