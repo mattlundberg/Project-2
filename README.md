@@ -33,7 +33,7 @@ Our proposal is to create a machine learning model that helps you predict whethe
 [Ready? Set? Wait.](https://docs.google.com/presentation/d/1pJ8xgxxK05_RRqku2S9UNKVRdpPeZABSz4UzP7nNt7k/edit?usp=sharing)
 
 ## Data sets
-[Airplane Data](https://www.kaggle.com/datasets/patrickzel/flight-delay-and-cancellation-dataset-2019-2023)
+[Flight Data](https://www.kaggle.com/datasets/patrickzel/flight-delay-and-cancellation-dataset-2019-2023)
 
 ## Future Research Questions and Issues
 - During development, we discovered a gap in our Airplane Data for the year 2024. After assessing the situation, we determined that incorporating this missing data would exceed our project timeline. For future iterations, we recommend including the 2024 data to ensure the model is trained on the most current and comprehensive information available. This update would enhance the accuracy and reliability of our predictions.
