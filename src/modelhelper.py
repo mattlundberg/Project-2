@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+import kagglehub
+import kagglehub.auth
+import os
+from dotenv import load_dotenv
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
@@ -31,10 +35,22 @@ class ModelHelper:
         self.scaler = StandardScaler()
         self.label_encoders = {}
         self.imputer = None
+        self.flightDataset = None
+        self.hasFlightDataset = False
         
         # Setup logging
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
+
+    def iniztialize_model(self, model_type: str, task: str) -> Any:
+        """
+        Initialize a model based on the provided type and task.
+        """
+        df = self.fetch_flight_dataset()
+        X_train, X_test, y_train, y_test = self.prepare_data(df, 'DELAY_CATEGORY', test_size=0.2, scale_data=True)
+        model = self.train_model(X_train, y_train, model_type, task)
+        return model
+            
 
     def clean_data(self, df: pd.DataFrame, target_column: str) -> pd.DataFrame:
         """
@@ -484,4 +500,47 @@ class ModelHelper:
             return model        
         except Exception as e:
             self.logger.error(f"Error loading model from {model_path}: {str(e)}")
-            raise      
+            raise  
+
+    def fetch_flight_dataset(self) -> pd.DataFrame:
+        """
+        Fetch flight dataset from Kaggle using kagglehub.
+        
+        Returns:
+            pd.DataFrame: Loaded dataset
+        """
+        df = self.flightDataset
+
+        if not self.hasFlightDataset:
+            print("Fetching flight dataset from Kaggle...")
+            df = self.fetch_dataset(os.environ['KAGGLE_FLIGHT_FILE_PATH'], os.environ['KAGGLE_FLIGHT_FILE_NAME'])
+            self.hasFlightDataset = True
+
+        self.flightDataset = df
+
+        if self.flightDataset is None:
+            raise ValueError("Flight dataset not found.")
+        
+        print("Preparing flight dataset...")
+        df_optmized = self.prepare_flight_dataset(df)
+        
+        return df_optmized
+
+    def fetch_dataset(self, file_path: str, file_name: str) -> pd.DataFrame:
+        """
+        Fetch dataset from Kaggle using kagglehub.
+        
+        Returns:
+            pd.DataFrame: Loaded dataset
+        """
+        # Load environment variables
+        load_dotenv()
+        
+        # Download latest version
+        path = kagglehub.dataset_download(
+            file_path
+        )
+        path = path + '/' + file_name
+
+        # Load dataset
+        return pd.read_csv(path, engine='python')    
