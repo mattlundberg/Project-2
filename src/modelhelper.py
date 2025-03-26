@@ -89,25 +89,6 @@ class ModelHelper:
         X = df.drop(columns=[target_column])
         y = df[target_column]
         
-        # Identify categorical and numerical columns
-        categorical_cols = X.select_dtypes(include=['object', 'category']).columns
-        numerical_cols = X.select_dtypes(include=[np.number]).columns
-        
-        # Encode categorical variables
-        for col in categorical_cols:
-            if col not in self.label_encoders:
-                self.label_encoders[col] = LabelEncoder()
-            X[col] = self.label_encoders[col].fit_transform(X[col])
-        
-        # Scale numerical features if requested
-        if scale_data and len(numerical_cols) > 0:
-            # Fit and transform the scaler on numerical columns
-            X[numerical_cols] = self.scaler.fit_transform(X[numerical_cols])
-            
-            # Ensure exact standardization
-            for col in numerical_cols:
-                X[col] = (X[col] - X[col].mean()) / X[col].std()
-        
         return X, y
 
     def prepare_data(self, df: pd.DataFrame, target_column: str, test_size: float = 0.2,
@@ -126,6 +107,7 @@ class ModelHelper:
         """
         # Clean the data
         df_cleaned = self.clean_data(df, target_column)
+        print(df_cleaned.info())
         
         # Preprocess features
         X, y = self.preprocess_features(df_cleaned, target_column, scale_data)
@@ -194,12 +176,7 @@ class ModelHelper:
         
         model = models[model_type]
         
-        # Ensure data is scaled for logistic regression
-        if model_type == 'logistic_regression':
-            X_train_scaled = self.scaler.fit_transform(X_train)
-            model.fit(X_train_scaled, y_train)
-        else:
-            model.fit(X_train, y_train)
+        model.fit(X_train, y_train)
             
         return model
 
