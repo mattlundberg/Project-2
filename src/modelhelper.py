@@ -89,6 +89,27 @@ class ModelHelper:
         X = df.drop(columns=[target_column])
         y = df[target_column]
         
+        # Identify categorical and numerical columns
+        categorical_cols = X.select_dtypes(include=['object', 'category']).columns
+        print(categorical_cols)
+        numerical_cols = X.select_dtypes(include=[np.number]).columns
+        print(numerical_cols)
+        
+        # Encode categorical variables
+        for col in categorical_cols:
+            if col not in self.label_encoders:
+                self.label_encoders[col] = LabelEncoder()
+            X[col] = self.label_encoders[col].fit_transform(X[col])
+        
+        # Scale numerical features if requested
+        if scale_data and len(numerical_cols) > 0:
+            # Fit and transform the scaler on numerical columns
+            X[numerical_cols] = self.scaler.fit_transform(X[numerical_cols])
+            
+            # Ensure exact standardization
+            for col in numerical_cols:
+                X[col] = (X[col] - X[col].mean()) / X[col].std()
+        
         return X, y
 
     def prepare_data(self, df: pd.DataFrame, target_column: str, test_size: float = 0.2,
@@ -107,7 +128,6 @@ class ModelHelper:
         """
         # Clean the data
         df_cleaned = self.clean_data(df, target_column)
-        print(df_cleaned.info())
         
         # Preprocess features
         X, y = self.preprocess_features(df_cleaned, target_column, scale_data)
@@ -151,7 +171,9 @@ class ModelHelper:
                     max_iter=1000,  # Increased from default 100
                     class_weight='balanced',  # Handle class imbalance
                     solver='lbfgs',  # Use L-BFGS solver
-                    multi_class='multinomial'  # Handle multiple classes
+                    multi_class='multinomial',  # Handle multiple classes
+                    penalty='l2',  # Use L2 regularization
+                    C=0.1 # Regularization strength
                 ),
                 'svm': SVC(random_state=self.random_state),
                 'decision_tree': DecisionTreeClassifier(
@@ -176,7 +198,12 @@ class ModelHelper:
         
         model = models[model_type]
         
-        model.fit(X_train, y_train)
+        # Ensure data is scaled for logistic regression
+        if model_type == 'logistic_regression':
+            X_train_scaled = self.scaler.fit_transform(X_train)
+            model.fit(X_train_scaled, y_train)
+        else:
+            model.fit(X_train, y_train)
             
         return model
 
@@ -214,18 +241,52 @@ class ModelHelper:
         
         return metrics
 
-    def predict(self, model: Any, X: pd.DataFrame) -> np.ndarray:
+    def predict(self, model: Any, airline: str, departure_date: str, origin: str) -> str:
         """
-        Make predictions using the trained model.
+        Make predictions for a specific flight using the trained model.
         
         Args:
             model: Trained model instance
-            X (pd.DataFrame): Features to predict
+            airline (str): Airline name
+            departure_date (str): Departure date in 'YYYY-MM-DD' format
+            origin (str): Origin airport code
             
         Returns:
-            np.ndarray: Predictions
+            str: Predicted delay category ('Early', 'On Time', or 'Delayed')
         """
-        return model.predict(X)
+        # Create a DataFrame with the input features in the correct order
+        input_data = pd.DataFrame({
+            'AIRLINE': [airline],
+            'ORIGIN': [origin],
+            'DEP_DELAY': [0],
+            'DAY_OF_WEEK': [pd.to_datetime(departure_date).dayofweek],
+            'TOTAL_DELAY': [0],
+        })
+        
+        # Ensure categorical columns are properly encoded
+        for col in ['AIRLINE', 'ORIGIN']:
+            if col in self.label_encoders:
+                input_data[col] = self.label_encoders[col].transform(input_data[col])
+        
+        # Get the feature names from the model's training data
+        feature_names = model.feature_names_in_ if hasattr(model, 'feature_names_in_') else input_data.columns
+        
+        # Reorder columns to match training data
+        input_data = input_data[feature_names]
+        
+        # Scale numerical features
+        numerical_cols = input_data.select_dtypes(include=[np.number]).columns
+        if len(numerical_cols) > 0:
+            input_data[numerical_cols] = self.scaler.transform(input_data[numerical_cols])
+        
+        # Make prediction
+        prediction = model.predict(input_data)[0]
+        
+        # Convert numeric prediction to category
+        if hasattr(self.label_encoders, 'DELAY_CATEGORY'):
+            prediction = self.label_encoders['DELAY_CATEGORY'].inverse_transform([prediction])[0]
+        
+        return prediction
 
     def optimize_flight_dataset_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -242,7 +303,7 @@ class ModelHelper:
         df = df[df['AIRLINE'].isin(top_airlines)]
         
         # Remove records before June 15, 2021
-        cutoff_date = pd.to_datetime('2023-01-01')
+        cutoff_date = pd.to_datetime('2021-06-15')
         df = df[pd.to_datetime(df['FL_DATE']) >= cutoff_date]
 
         
@@ -337,7 +398,6 @@ class ModelHelper:
                         'DELAY_DUE_NAS', 'DELAY_DUE_SECURITY', 
                         'DELAY_DUE_LATE_AIRCRAFT']
         df['TOTAL_DELAY'] = df[delay_columns].sum(axis=1)
-        
         # Handle class imbalance for delay categories
         print("Handling class imbalance...")
         delay_counts = df['DELAY_CATEGORY'].value_counts()
