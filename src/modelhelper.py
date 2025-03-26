@@ -76,12 +76,13 @@ class ModelHelper:
                 ),
                 'logistic_regression': LogisticRegression(
                     random_state=self.random_state,
-                    max_iter=1000,
+                    max_iter=2000,
                     class_weight='balanced',
-                    solver='lbfgs',
+                    solver='saga',
                     multi_class='multinomial',
-                    penalty='l2',
-                    C=0.1
+                    penalty='l1',
+                    C=1.0,
+                    tol=1e-4
                 ),
                 'svm': SVC(random_state=self.random_state),
                 'decision_tree': DecisionTreeClassifier(
