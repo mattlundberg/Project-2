@@ -3,20 +3,21 @@ from tkinter import ttk
 from tkcalendar import DateEntry
 import pandas as pd
 from datetime import datetime
-from datetime import timedelta
-from helperclasses import DataFetcherKAGGLE
-#import your_ml_model  # Import your ML model here
+from modelhelper import ModelHelper  # Import the ModelHelper class 
+
+print("Loading Airports")
 
 # Load airports from CSV
 airport_df = pd.read_csv('airports.csv')
 airports = airport_df['AIRPORT'].tolist()
 
-#Load airlines data from Kaggle
-# data_fetcher = DataFetcherKAGGLE()
-# flight_data = data_fetcher.fetch_flight_dataset()
-# airlines_demo = flight_data['AIRLINE'].unique().tolist()
+print("Loading Airlines")
+# Define airlines for dropdown
+airlines = ['Southwest Airlines Co.', 'Delta Air Lines Inc.', 'American Airlines Inc.', 'Spirit Air Lines', 'Allegiant Air']
 
-airlines = ['American Airlines', 'Delta Air Lines', 'United Airlines', 'Southwest Airlines', 'JetBlue Airways']
+print("Loading Model")
+model_helper = ModelHelper()
+model = model_helper.iniztialize_model('logistic_regression','classification')
 
 def predict_flight():
     # Get input values from GUI
@@ -24,11 +25,37 @@ def predict_flight():
     departure_date = departure_date_cal.get_date()
     origin = origin_combobox.get()
 
-    # Call your ML model's prediction function
-    prediction = your_ml_model.predict(airline, departure_date, origin)
+    # Call the prepare_and_predict function
+    prediction = prepare_and_predict(airline, origin, departure_date)
 
     # Update result labels
-    delay_prob_label.config(text=f"Delay Probability: {prediction['delay_probability']:.2f}%")
+    result_label.config(text=f"Flight Status Prediction: {prediction.capitalize()}")
+
+
+def prepare_and_predict(airline, origin, departure_date):
+    # Create a dataframe from the inputs
+    input_df = pd.DataFrame({
+        'ORIGIN': [origin]
+    })
+
+    # Load the transformation mapping from CSV
+    airports_df = pd.read_csv('airports.csv')
+
+    # Create a mapping dictionary from AIRPORT_NAME to AIRPORT_CODE
+    airport_mapping = dict(zip(airports_df['AIRPORT'], airports_df['Airport Code']))
+
+    # Transform the ORIGIN to AIRPORT_CODE
+    if origin in airport_mapping:
+        input_df['ORIGIN'] = airport_mapping[origin]
+    else:
+        raise ValueError(f"Origin airport '{origin}' not found in the airports database.")
+
+    # Make prediction using the ML model
+    prediction = model_helper.predict(model=model, airline=airline, departure_date=departure_date, origin=input_df['ORIGIN'].iloc[0])    return prediction
+
+    # Used for testing output
+    #test = print(input_df)
+    #return test
 
 # Create main window
 root = tk.Tk()
@@ -54,9 +81,9 @@ origin_combobox.set("Select origin airport")  # Set default text
 predict_button = ttk.Button(root, text="Predict Flight", command=predict_flight)
 
 # Create result labels
-delay_prob_label = ttk.Label(root, text="Delay Probability: ")
+result_label = ttk.Label(root, text="Your Flight Is Likely To Be: ")
 
-# Layout widgets
+# Layout widget parameters
 airline_label.grid(row=0, column=0, padx=5, pady=5, sticky="e")
 airline_combobox.grid(row=0, column=1, padx=5, pady=5)
 
@@ -68,6 +95,6 @@ origin_combobox.grid(row=2, column=1, padx=5, pady=5)
 
 predict_button.grid(row=3, column=0, columnspan=2, padx=5, pady=10)
 
-delay_prob_label.grid(row=5, column=0, columnspan=2, padx=5, pady=5)
+result_label.grid(row=5, column=0, columnspan=2, padx=5, pady=5)
 
 root.mainloop()
