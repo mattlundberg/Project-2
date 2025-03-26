@@ -16,10 +16,10 @@ Join our Slack channel for project discussions and updates:
 | Milestone | Due Date | Status |
 |----------|----------|----------|
 | Project Ideation | 3/18/25 | Complete |
-| Data Fetching & Clean Up | 3/20/25 | In Progress |
-| Data Exploration & Build | 3/24/25 | To Do |
-| Model Selection | 3/25/25 | To Do |
-| Model/UI Connection | 3/25/25 | To Do |
+| Data Fetching & Clean Up | 3/20/25 | Complete |
+| Data Exploration & Build | 3/24/25 | Complete |
+| Model Selection | 3/25/25 | Complete |
+| Model/UI Connection | 3/25/25 | In Progress |
 | Testing | Ad Hoc | In Progress |
 | Finalize Documentation | 3/27/25 | To Do |
 | Create Presentation | 3/27/25 | To Do |
@@ -36,7 +36,9 @@ Our proposal is to create a machine learning model that helps you predict whethe
 [Airplane Data](https://www.kaggle.com/datasets/patrickzel/flight-delay-and-cancellation-dataset-2019-2023)
 
 ## Future Research Questions and Issues
-- During development, we discovered a gap in our Airplane Data for the year 2024. After assessing the situation, we determined that incorporating this missing data would exceed our project timeline. For future iterations, we recommend including the 2024 data to ensure the model is trained on the most current and comprehensive information available. This update would enhance the accuracy and reliability of our predictions. 
+- During development, we discovered a gap in our Airplane Data for the year 2024. After assessing the situation, we determined that incorporating this missing data would exceed our project timeline. For future iterations, we recommend including the 2024 data to ensure the model is trained on the most current and comprehensive information available. This update would enhance the accuracy and reliability of our predictions.
+- Due to the paywall limits of the NOAA weather, we were unable to pull all of the historical data we would have needed to integrate the weather into our model. Future iterations would see us using that data.
+- During development we found that there was some awesome categorical data within the kaggle set such as the reason why a flight was delayed that would be interesting to utilize. The time restrictions for this project and hardware memory limits made more nuanced and complicated model training impossible.
 
 # Program Information 
 ## Program Information
