@@ -164,7 +164,13 @@ class ModelHelper:
         if task == 'classification':
             models = {
                 'random_forest': RandomForestClassifier(random_state=self.random_state),
-                'logistic_regression': LogisticRegression(random_state=self.random_state),
+                'logistic_regression': LogisticRegression(
+                    random_state=self.random_state,
+                    max_iter=1000,  # Increased from default 100
+                    class_weight='balanced',  # Handle class imbalance
+                    solver='lbfgs',  # Use L-BFGS solver
+                    multi_class='multinomial'  # Handle multiple classes
+                ),
                 'svm': SVC(random_state=self.random_state),
                 'decision_tree': DecisionTreeClassifier(
                     random_state=self.random_state,
@@ -187,7 +193,14 @@ class ModelHelper:
             raise ValueError(f"Invalid model type. For {task}, choose from: {list(models.keys())}")
         
         model = models[model_type]
-        model.fit(X_train, y_train)
+        
+        # Ensure data is scaled for logistic regression
+        if model_type == 'logistic_regression':
+            X_train_scaled = self.scaler.fit_transform(X_train)
+            model.fit(X_train_scaled, y_train)
+        else:
+            model.fit(X_train, y_train)
+            
         return model
 
     def evaluate_model(self, model: Any, X_test: pd.DataFrame, y_test: pd.Series,
