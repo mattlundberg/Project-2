@@ -1,10 +1,16 @@
+# Standard library imports
+import os
+import logging
+import pickle
+import warnings
+from typing import Union, Tuple, Optional, Dict, Any, List
+
+# Third-party imports
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import pickle
 import kagglehub
 import kagglehub.auth
-import os
 from dotenv import load_dotenv
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
@@ -13,10 +19,20 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.svm import SVC, SVR
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, mean_squared_error, r2_score
-import logging
-from typing import Union, Tuple, Optional, Dict, Any
-import warnings
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    mean_squared_error, r2_score
+)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Constants
+DEFAULT_RANDOM_STATE = 42
+CUTOFF_DATE = '2021-06-15'
+DELAY_BINS = [-np.inf, -15, 15, np.inf]
+DELAY_LABELS = ['Early', 'On Time', 'Delayed']
 
 class ModelHelper:
     """
@@ -24,271 +40,223 @@ class ModelHelper:
     Includes data cleaning, feature engineering, and model selection capabilities.
     """
     
-    def __init__(self, random_state: int = 42):
+    def __init__(self, random_state: int = DEFAULT_RANDOM_STATE):
         """
-        Initialize ModelHelper with available models and preprocessing tools.
+        Initialize ModelHelper with preprocessing tools and model configurations.
         
         Args:
             random_state (int): Seed for reproducibility
         """
         self.random_state = random_state
         self.scaler = StandardScaler()
-        self.label_encoders = {}
+        self.label_encoders: Dict[str, LabelEncoder] = {}
         self.imputer = None
-        self.flightDataset = None
-        self.hasFlightDataset = False
-        
-        # Setup logging
-        logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
+        self.flight_dataset = None
+        self.has_flight_dataset = False
+        self.logger = logger
+        self.model = None
 
-    def iniztialize_model(self, model_type: str, task: str) -> Any:
-        """
-        Initialize a model based on the provided type and task.
-        """
-        df = self.fetch_flight_dataset()
-        X_train, X_test, y_train, y_test = self.prepare_data(df, 'DELAY_CATEGORY', test_size=0.2, scale_data=True)
-        model = self.train_model(X_train, y_train, model_type, task)
-        return model
-            
-
-    def clean_data(self, df: pd.DataFrame, target_column: str) -> pd.DataFrame:
-        """
-        Clean the dataset by handling missing values, removing duplicates,
-        and identifying outliers.
-        
-        Args:
-            df (pd.DataFrame): Input DataFrame
-            target_column (str): Name of the target variable
-            
-        Returns:
-            pd.DataFrame: Cleaned DataFrame
-        """
-        # Create a copy to avoid modifying the original dataframe
-        df_cleaned = df.copy()
-        
-        # Remove duplicates
-        initial_rows = len(df_cleaned)
-        df_cleaned = df_cleaned.drop_duplicates()
-        if len(df_cleaned) < initial_rows:
-            self.logger.info(f"Removed {initial_rows - len(df_cleaned)} duplicate rows")
-        
-        # Handle missing values
-        missing_counts = df_cleaned.isnull().sum()
-        if missing_counts.any():
-            self.logger.info(f"Missing values found:\n{missing_counts[missing_counts > 0]}")
-            
-            # For numerical columns, fill with median
-            numerical_cols = df_cleaned.select_dtypes(include=[np.number]).columns
-            df_cleaned[numerical_cols] = df_cleaned[numerical_cols].fillna(df_cleaned[numerical_cols].median())
-            
-            # For categorical columns, fill with mode
-            categorical_cols = df_cleaned.select_dtypes(include=['object', 'category']).columns
-            df_cleaned[categorical_cols] = df_cleaned[categorical_cols].fillna(df_cleaned[categorical_cols].mode().iloc[0])
-        
-        return df_cleaned
-
-    def preprocess_features(self, df: pd.DataFrame, target_column: str, 
-                          scale_data: bool = True) -> Tuple[pd.DataFrame, pd.Series]:
-        """
-        Preprocess features by encoding categorical variables and scaling numerical features.
-        
-        Args:
-            df (pd.DataFrame): Input DataFrame
-            target_column (str): Name of the target variable
-            scale_data (bool): Whether to scale numerical features
-            
-        Returns:
-            Tuple[pd.DataFrame, pd.Series]: Preprocessed features and target variable
-        """
-        # Separate features and target
-        X = df.drop(columns=[target_column])
-        y = df[target_column]
-        
-        # Identify categorical and numerical columns
-        categorical_cols = X.select_dtypes(include=['object', 'category']).columns
-        print(categorical_cols)
-        numerical_cols = X.select_dtypes(include=[np.number]).columns
-        print(numerical_cols)
-        
-        # Encode categorical variables
-        for col in categorical_cols:
-            if col not in self.label_encoders:
-                self.label_encoders[col] = LabelEncoder()
-            X[col] = self.label_encoders[col].fit_transform(X[col])
-        
-        # Scale numerical features if requested
-        if scale_data and len(numerical_cols) > 0:
-            # Fit and transform the scaler on numerical columns
-            X[numerical_cols] = self.scaler.fit_transform(X[numerical_cols])
-            
-            # Ensure exact standardization
-            for col in numerical_cols:
-                X[col] = (X[col] - X[col].mean()) / X[col].std()
-        
-        return X, y
-
-    def prepare_data(self, df: pd.DataFrame, target_column: str, test_size: float = 0.2,
-                    scale_data: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-        """
-        Prepare data for modeling by cleaning, preprocessing, and splitting into train/test sets.
-        
-        Args:
-            df (pd.DataFrame): Input DataFrame
-            target_column (str): Name of the target variable
-            test_size (float): Proportion of dataset to include in the test split
-            scale_data (bool): Whether to scale numerical features
-            
-        Returns:
-            Tuple containing train/test splits for features and target
-        """
-        # Clean the data
-        df_cleaned = self.clean_data(df, target_column)
-        
-        # Preprocess features
-        X, y = self.preprocess_features(df_cleaned, target_column, scale_data)
-        
-        # Split the data
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=self.random_state
-        )
-        
-        # Ensure exact standardization for training data
-        numerical_cols = X_train.select_dtypes(include=[np.number]).columns
-        for col in numerical_cols:
-            X_train[col] = (X_train[col] - X_train[col].mean()) / X_train[col].std()
-            # Apply the same scaling to test data
-            X_test[col] = (X_test[col] - X_train[col].mean()) / X_train[col].std()
-        
-        return X_train, X_test, y_train, y_test
-
-    def train_model(self, X_train: pd.DataFrame, y_train: pd.Series,
-                   model_type: str = 'random_forest', task: str = 'classification') -> Any:
-        """
-        Train a specified model on the prepared data.
-        
-        Args:
-            X_train (pd.DataFrame): Training features
-            y_train (pd.Series): Training target
-            model_type (str): Type of model to train
-            task (str): 'classification' or 'regression'
-            
-        Returns:
-            Trained model instance
-        """
+    def _get_model_config(self, model_type: str, task: str) -> Dict[str, Any]:
+        """Get model configuration based on type and task."""
         if task not in ['classification', 'regression']:
             raise ValueError("Task must be either 'classification' or 'regression'")
         
         if task == 'classification':
-            models = {
-                'random_forest': RandomForestClassifier(random_state=self.random_state),
+            return {
+                'random_forest': RandomForestClassifier(
+                    random_state=self.random_state,
+                    n_estimators=100,
+                    max_depth=5,
+                    min_samples_split=20,
+                    min_samples_leaf=10,
+                    max_features='sqrt',
+                    class_weight='balanced',
+                    bootstrap=True,
+                    oob_score=True
+                ),
                 'logistic_regression': LogisticRegression(
                     random_state=self.random_state,
-                    max_iter=1000,  # Increased from default 100
-                    class_weight='balanced',  # Handle class imbalance
-                    solver='lbfgs',  # Use L-BFGS solver
-                    multi_class='multinomial',  # Handle multiple classes
-                    penalty='l2',  # Use L2 regularization
-                    C=0.1 # Regularization strength
+                    max_iter=1000,
+                    class_weight='balanced',
+                    solver='lbfgs',
+                    multi_class='multinomial',
+                    penalty='l2',
+                    C=0.1
                 ),
                 'svm': SVC(random_state=self.random_state),
                 'decision_tree': DecisionTreeClassifier(
                     random_state=self.random_state,
-                    max_depth=10,  # Limit tree depth to prevent overfitting
-                    min_samples_split=5,  # Minimum samples required to split
-                    min_samples_leaf=2,  # Minimum samples in leaf nodes
-                    class_weight='balanced',  # Handle class imbalance
-                    criterion='gini'  # Use Gini impurity for classification
+                    max_depth=10,
+                    min_samples_split=5,
+                    min_samples_leaf=2,
+                    class_weight='balanced',
+                    criterion='gini'
                 )
             }
         else:
-            models = {
+            return {
                 'random_forest': RandomForestRegressor(random_state=self.random_state),
                 'linear_regression': LinearRegression(),
                 'svr': SVR(),
                 'decision_tree': DecisionTreeRegressor(random_state=self.random_state)
             }
+
+    def _handle_missing_values(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Handle missing values in the dataset."""
+        df_cleaned = df.copy()
+        missing_counts = df_cleaned.isnull().sum()
+        
+        if missing_counts.any():
+            self.logger.info(f"Missing values found:\n{missing_counts[missing_counts > 0]}")
+            
+            # Handle numerical columns
+            numerical_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+            df_cleaned[numerical_cols] = df_cleaned[numerical_cols].fillna(
+                df_cleaned[numerical_cols].median()
+            )
+            
+            # Handle categorical columns
+            categorical_cols = df_cleaned.select_dtypes(include=['object', 'category']).columns
+            df_cleaned[categorical_cols] = df_cleaned[categorical_cols].fillna(
+                df_cleaned[categorical_cols].mode().iloc[0]
+            )
+        
+        return df_cleaned
+
+    def _encode_categorical_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Encode categorical features using LabelEncoder."""
+        categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+        for col in categorical_cols:
+            if col not in self.label_encoders:
+                self.label_encoders[col] = LabelEncoder()
+            df[col] = self.label_encoders[col].fit_transform(df[col])
+        return df
+
+    def _scale_numerical_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Scale numerical features using StandardScaler."""
+        numerical_cols = df.select_dtypes(include=[np.number]).columns
+        if len(numerical_cols) > 0:
+            df[numerical_cols] = self.scaler.fit_transform(df[numerical_cols])
+            for col in numerical_cols:
+                df[col] = (df[col] - df[col].mean()) / df[col].std()
+        return df
+
+    def _balance_dataset(self, df: pd.DataFrame, target_column: str) -> pd.DataFrame:
+        """Balance the dataset using oversampling."""
+        delay_counts = df[target_column].value_counts()
+        if len(delay_counts) == 0:
+            raise ValueError("No data available after preprocessing")
+            
+        max_delay = delay_counts.max()
+        balanced_dfs = []
+        
+        for category in df[target_column].unique():
+            category_df = df[df[target_column] == category]
+            if len(category_df) > 0:
+                if len(category_df) < max_delay:
+                    category_df = category_df.sample(
+                        n=max_delay, replace=True, random_state=self.random_state
+                    )
+                balanced_dfs.append(category_df)
+        
+        if not balanced_dfs:
+            raise ValueError("No valid data categories found after balancing")
+            
+        return pd.concat(balanced_dfs)
+
+    def _prepare_features(self, df: pd.DataFrame, target_column: str) -> pd.DataFrame:
+        """Prepare features for modeling."""
+        # Create time-based features
+        df['DAY_OF_WEEK'] = pd.to_datetime(df['FL_DATE']).dt.dayofweek
+        
+        # Create delay categories
+        df['DELAY_CATEGORY'] = pd.cut(
+            df['DEP_DELAY'], 
+            bins=DELAY_BINS,
+            labels=DELAY_LABELS
+        )
+        
+        # Create total delay feature
+        delay_columns = [
+            'DELAY_DUE_CARRIER', 'DELAY_DUE_WEATHER', 
+            'DELAY_DUE_NAS', 'DELAY_DUE_SECURITY', 
+            'DELAY_DUE_LATE_AIRCRAFT'
+        ]
+        df['TOTAL_DELAY'] = df[delay_columns].sum(axis=1)
+
+        # Drop delay columns
+        df.drop(columns=delay_columns, inplace=True)
+        
+        return df
+
+    def _drop_unnecessary_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Drop columns not needed for modeling."""
+        columns_to_drop = [
+            'AIRLINE_DOT', 'AIRLINE_CODE', 'DOT_CODE', 'FL_NUMBER',
+            'CRS_DEP_TIME', 'TAXI_OUT', 'WHEELS_OFF', 'WHEELS_ON',
+            'TAXI_IN', 'CRS_ARR_TIME', 'ARR_TIME', 'ARR_DELAY',
+            'CRS_ELAPSED_TIME', 'AIR_TIME', 'DISTANCE', 'DEST',
+            'DEST_CITY', 'ELAPSED_TIME', 'DEP_TIME', 'ORIGIN_CITY',
+            'CANCELLED', 'CANCELLATION_CODE', 'DIVERTED', 'FL_DATE',
+            'DEP_DELAY'
+        ]
+        return df.drop(columns=[col for col in columns_to_drop if col in df.columns])
+
+    def prepare_flight_dataset(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Prepare the flight dataset for modeling."""
+        self.logger.info("Optimizing flight dataset data types...")
+        df = self._optimize_flight_dataset_dtypes(df)
+        
+        self.logger.info("Performing feature engineering...")
+        df = self._prepare_features(df, 'DELAY_CATEGORY')
+        
+        self.logger.info("Handling class imbalance...")
+        df = self._balance_dataset(df, 'DELAY_CATEGORY')
+        
+        df = self._drop_unnecessary_columns(df)
+        self.flight_dataset = df
+        
+        return df
+
+    def train_model(self, X_train: Union[pd.DataFrame, np.ndarray], y_train: pd.Series,
+                   model_type: str = 'random_forest', task: str = 'classification') -> Any:
+        """Train a specified model on the prepared data."""
+        models = self._get_model_config(model_type, task)
         
         if model_type not in models:
             raise ValueError(f"Invalid model type. For {task}, choose from: {list(models.keys())}")
         
         model = models[model_type]
         
-        # Ensure data is scaled for logistic regression
-        if model_type == 'logistic_regression':
-            X_train_scaled = self.scaler.fit_transform(X_train)
-            model.fit(X_train_scaled, y_train)
-        else:
-            model.fit(X_train, y_train)
-            
+        self.logger.info(f"Training {model_type} model for {task} task")
+        
+        # Log features only if X_train is a DataFrame
+        if isinstance(X_train, pd.DataFrame):
+            self.logger.info(f"Features: {X_train.columns.tolist()}")
+        
+        if y_train is not None:
+            self.logger.info(f"Target: {y_train.name}")
+        
+        model.fit(X_train, y_train)
         return model
 
-    def evaluate_model(self, model: Any, X_test: pd.DataFrame, y_test: pd.Series,
-                      task: str = 'classification') -> Dict[str, float]:
-        """
-        Evaluate the trained model on test data.
-        
-        Args:
-            model: Trained model instance
-            X_test (pd.DataFrame): Test features
-            y_test (pd.Series): Test target
-            task (str): 'classification' or 'regression'
-            
-        Returns:
-            Dict[str, float]: Dictionary containing evaluation metrics
-        """
-        if task not in ['classification', 'regression']:
-            raise ValueError("Task must be either 'classification' or 'regression'")
-        
-        y_pred = model.predict(X_test)
-        
-        if task == 'classification':
-            metrics = {
-                'accuracy': accuracy_score(y_test, y_pred),
-                'precision': precision_score(y_test, y_pred, average='weighted'),
-                'recall': recall_score(y_test, y_pred, average='weighted'),
-                'f1': f1_score(y_test, y_pred, average='weighted')
-            }
-        else:
-            metrics = {
-                'mse': mean_squared_error(y_test, y_pred),
-                'r2': r2_score(y_test, y_pred)
-            }
-        
-        return metrics
-
-    def predict(self, model: Any, airline: str, departure_date: str, origin: str) -> str:
-        """
-        Make predictions for a specific flight using the trained model.
-        
-        Args:
-            model: Trained model instance
-            airline (str): Airline name
-            departure_date (str): Departure date in 'YYYY-MM-DD' format
-            origin (str): Origin airport code
-            
-        Returns:
-            str: Predicted delay category ('Early', 'On Time', or 'Delayed')
-        """
-        # Create a DataFrame with the input features in the correct order
+    def predict(self, airline: str, departure_date: str, origin: str) -> str:
+        """Make predictions for a specific flight."""
         input_data = pd.DataFrame({
             'AIRLINE': [airline],
             'ORIGIN': [origin],
-            'DEP_DELAY': [0],
             'DAY_OF_WEEK': [pd.to_datetime(departure_date).dayofweek],
-            'TOTAL_DELAY': [0],
+            'TOTAL_DELAY': [0]
         })
         
-        # Ensure categorical columns are properly encoded
+        # Encode categorical features
         for col in ['AIRLINE', 'ORIGIN']:
             if col in self.label_encoders:
-                input_data[col] = self.label_encoders[col].transform(input_data[col])
-        
-        # Get the feature names from the model's training data
-        feature_names = model.feature_names_in_ if hasattr(model, 'feature_names_in_') else input_data.columns
-        
-        # Reorder columns to match training data
-        input_data = input_data[feature_names]
+                try:
+                    input_data[col] = self.label_encoders[col].transform(input_data[col])
+                except ValueError:
+                    self.logger.warning(f"Unknown {col}: {input_data[col].iloc[0]}")
+                    input_data[col] = 0
         
         # Scale numerical features
         numerical_cols = input_data.select_dtypes(include=[np.number]).columns
@@ -296,7 +264,7 @@ class ModelHelper:
             input_data[numerical_cols] = self.scaler.transform(input_data[numerical_cols])
         
         # Make prediction
-        prediction = model.predict(input_data)[0]
+        prediction = self.model.predict(input_data)[0]
         
         # Convert numeric prediction to category
         if hasattr(self.label_encoders, 'DELAY_CATEGORY'):
@@ -304,7 +272,7 @@ class ModelHelper:
         
         return prediction
 
-    def optimize_flight_dataset_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _optimize_flight_dataset_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Optimize data types for the flight dataset.
         
@@ -315,8 +283,8 @@ class ModelHelper:
             pd.DataFrame: DataFrame with optimized data types
         """
         # Get the top 5 airlines by frequency
-        top_airlines = ['Southwest Airlines Co.', 'American Airlines Inc.', 'Delta Air Lines Inc.', 'Spirit Air Lines', 'Allegiant Air']
-        df = df[df['AIRLINE'].isin(top_airlines)]
+        #top_airlines = ['Southwest Airlines Co.', 'American Airlines Inc.', 'Delta Air Lines Inc.', 'Spirit Air Lines', 'Allegiant Air']
+        #df = df[df['AIRLINE'].isin(top_airlines)]
         
         # Remove records before June 15, 2021
         cutoff_date = pd.to_datetime('2021-06-15')
@@ -363,88 +331,6 @@ class ModelHelper:
         
         return df
     
-    def prepare_flight_dataset(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Prepare the flight dataset for modeling.
-        """
-        print("Optimizing flight dataset data types...")
-        df = self.optimize_flight_dataset_dtypes(df)
-
-        # Drop columns not needed for modeling
-        columns_to_drop = [
-            'AIRLINE_DOT',    # Redundant airline identifier
-            'AIRLINE_CODE',   # Redundant airline identifier  
-            'DOT_CODE',       # Redundant airline identifier
-            'FL_NUMBER',      # Flight number not predictive
-            'CRS_DEP_TIME',   # Will extract hour instead
-            'TAXI_OUT',       # Not available at prediction time
-            'WHEELS_OFF',     # Not available at prediction time  
-            'WHEELS_ON',      # Not available at prediction time
-            'TAXI_IN',        # Not available at prediction time
-            'CRS_ARR_TIME',   # Not needed for departure delay prediction
-            'ARR_TIME',       # Not available at prediction time
-            'ARR_DELAY',      # Not available at prediction time
-            'CRS_ELAPSED_TIME', # Will use distance instead
-            'AIR_TIME',       # Not available at prediction time
-            'DISTANCE',       # Keeping for route complexity calculation
-            'DEST',          # Using DEST_CITY instead
-            'DEST_CITY',     # Destination may affect delays
-            'ELAPSED_TIME',  # Not available at prediction time
-            'DEP_TIME',      # Not available at prediction time
-            'ORIGIN_CITY',   # Origin may affect delays
-            'CANCELLED',     # Not predicting cancellations
-            'CANCELLATION_CODE', # Not predicting cancellations
-            'DIVERTED'       # Not predicting diversions
-        ]
-        df = df.drop(columns=columns_to_drop)
-        
-        # Feature Engineering
-        print("Performing feature engineering...")
-        
-        # Create time-based features from scheduled departure time
-        df['DAY_OF_WEEK'] = pd.to_datetime(df['FL_DATE']).dt.dayofweek
-        
-        # Create delay categories based on departure delay
-        df['DELAY_CATEGORY'] = pd.cut(df['DEP_DELAY'], 
-                                    bins=[-np.inf, -15, 15, np.inf],
-                                    labels=['Early', 'On Time', 'Delayed'])
-        
-        # Create total delay feature from all delay types
-        delay_columns = ['DELAY_DUE_CARRIER', 'DELAY_DUE_WEATHER', 
-                        'DELAY_DUE_NAS', 'DELAY_DUE_SECURITY', 
-                        'DELAY_DUE_LATE_AIRCRAFT']
-        df['TOTAL_DELAY'] = df[delay_columns].sum(axis=1)
-        # Handle class imbalance for delay categories
-        print("Handling class imbalance...")
-        delay_counts = df['DELAY_CATEGORY'].value_counts()
-        
-        # Check if we have any data
-        if len(delay_counts) == 0:
-            raise ValueError("No data available after preprocessing")
-            
-        max_delay = delay_counts.max()
-        
-        # Balance the dataset using oversampling
-        balanced_dfs = []
-        for category in df['DELAY_CATEGORY'].unique():
-            category_df = df[df['DELAY_CATEGORY'] == category]
-            if len(category_df) > 0:  # Only process non-empty categories
-                if len(category_df) < max_delay:
-                    # Oversample minority classes
-                    category_df = category_df.sample(n=max_delay, replace=True, random_state=self.random_state)
-                balanced_dfs.append(category_df)
-        
-        if not balanced_dfs:
-            raise ValueError("No valid data categories found after balancing")
-            
-        df = pd.concat(balanced_dfs)
-        
-        # Drop remaining columns not needed for modeling
-        final_columns_to_drop = ['FL_DATE'] + delay_columns
-        df = df.drop(columns=final_columns_to_drop, errors='ignore')
-        
-        return df
-
     def save_model(self, model: Any, model_name: str) -> None:
         """
         Save a trained model to the models directory.
@@ -509,20 +395,19 @@ class ModelHelper:
         Returns:
             pd.DataFrame: Loaded dataset
         """
-        df = self.flightDataset
+        df = self.flight_dataset
 
-        if not self.hasFlightDataset:
+        if not self.has_flight_dataset:
             print("Fetching flight dataset from Kaggle...")
             df = self.fetch_dataset(os.environ['KAGGLE_FLIGHT_FILE_PATH'], os.environ['KAGGLE_FLIGHT_FILE_NAME'])
-            self.hasFlightDataset = True
+            print("Preparing flight dataset...")
+            df_optmized = self.prepare_flight_dataset(df)
+            self.has_flight_dataset = True
 
-        self.flightDataset = df
+        self.flight_dataset = df
 
-        if self.flightDataset is None:
+        if self.flight_dataset is None:
             raise ValueError("Flight dataset not found.")
-        
-        print("Preparing flight dataset...")
-        df_optmized = self.prepare_flight_dataset(df)
         
         return df_optmized
 
@@ -544,3 +429,68 @@ class ModelHelper:
 
         # Load dataset
         return pd.read_csv(path, engine='python')    
+
+    def train_flight_delay_model(self, model_type: str = 'logistic_regression', test_size: float = 0.2) -> Tuple[Any, Dict[str, float]]:
+        """
+        Orchestrate the complete process of retrieving data and training a flight delay prediction model.
+        """
+        self.logger.info("Starting flight delay model training process...")
+        
+        # Step 1: Fetch and prepare the dataset
+        self.logger.info("Step 1: Fetching and preparing the dataset...")
+        df = self.fetch_flight_dataset()
+        self.logger.info(f"Dataset shape: {df.shape}")
+        
+        # Step 2: Prepare features and target
+        self.logger.info("Step 2: Preparing features and target...")
+        X = df.drop(columns=['DELAY_CATEGORY'])
+        y = df['DELAY_CATEGORY']
+        
+        # Log original features for reference
+        self.logger.info(f"Features being used: {X.columns.tolist()}")
+        
+        # Step 3: Split the data
+        self.logger.info(f"Step 3: Splitting data into train/test sets (test_size={test_size})...")
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=self.random_state
+        )
+        self.logger.info(f"Training set shape: {X_train.shape}")
+        self.logger.info(f"Test set shape: {X_test.shape}")
+        
+        # Step 4: Preprocess the data
+        self.logger.info("Step 4: Preprocessing features...")
+        # First encode categorical features
+        X_train_processed = self._encode_categorical_features(X_train.copy())
+        X_test_processed = self._encode_categorical_features(X_test.copy())
+        
+        # Then scale if using logistic regression
+        if model_type == 'logistic_regression':
+            X_train_processed = self.scaler.fit_transform(X_train_processed)
+            X_test_processed = self.scaler.transform(X_test_processed)
+        
+        # Step 5: Train the model
+        self.logger.info(f"Step 5: Training {model_type} model...")
+        model = self.train_model(X_train_processed, y_train, model_type=model_type)
+        self.model = model
+        
+        # Step 6: Evaluate the model
+        self.logger.info("Step 6: Evaluating model performance...")
+        y_pred = model.predict(X_test_processed)
+        metrics = {
+            'accuracy': accuracy_score(y_test, y_pred),
+            'precision': precision_score(y_test, y_pred, average='weighted'),
+            'recall': recall_score(y_test, y_pred, average='weighted'),
+            'f1': f1_score(y_test, y_pred, average='weighted')
+        }
+        
+        # Log the results
+        self.logger.info("\nModel Evaluation Results:")
+        for metric, value in metrics.items():
+            self.logger.info(f"{metric.capitalize()}: {value:.4f}")
+        
+        # Step 7: Save the model
+        self.logger.info(f"Step 7: Saving the trained model as '{model_type}_flight_delay_model.pkl'...")
+        self.save_model(model, f"{model_type}_flight_delay_model")
+        
+        self.logger.info("\nModel training process completed successfully!")
+        return model, metrics    
