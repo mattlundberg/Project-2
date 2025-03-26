@@ -27,25 +27,16 @@ Join our Slack channel for project discussions and updates:
 ## Proposal
 Air travel: where the thrill of soaring 35,000 feet in the air is matched only by the agony of waiting on the ground for your delayed flight. It's like being a contestant in a real-life game of "Will I Make My Connection?"—except instead of prizes, you win stress and a possible overnight stay in an airport lounge.
 
-Our proposal is to create a machine learning model that helps you predict whether your flight will be delayed. By feeding it four crucial pieces of information—date, origin, destination, and airline— our model will give you a heads-up on whether you should start practicing your "I'm stuck in the airport" face or if you'll actually make it to your destination on time.
+Our proposal is to create a machine learning model that helps you predict whether your flight will be delayed. By feeding it three crucial pieces of information —date, origin, and airline— our model will give you a heads-up on whether you should start practicing your "I'm stuck in the airport" face or if you'll actually make it to your destination on time.
 
 ## Slide Deck
-TBD
+[Ready? Set? Wait.](https://docs.google.com/presentation/d/1pJ8xgxxK05_RRqku2S9UNKVRdpPeZABSz4UzP7nNt7k/edit?usp=sharing)
 
 ## Data sets
-[Weather Data](https://www.ncdc.noaa.gov/cdo-web/webservices/v2#gettingStarted)
-
 [Airplane Data](https://www.kaggle.com/datasets/patrickzel/flight-delay-and-cancellation-dataset-2019-2023)
 
 ## Future Research Questions and Issues
 - During development, we discovered a gap in our Airplane Data for the year 2024. After assessing the situation, we determined that incorporating this missing data would exceed our project timeline. For future iterations, we recommend including the 2024 data to ensure the model is trained on the most current and comprehensive information available. This update would enhance the accuracy and reliability of our predictions. 
-Here is the link to get the airline delayed/cancelled data
-- https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGJ&QO_fu146_anzr=b0-gvzr
-- https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGJ&QO_fu146_anzr=b0-gvzr
-
-https://www.ncdc.noaa.gov API: 
-- email: matthew.d.lundberg
-- token: bjJHSvSZxSmURbGZiokSEwfqFjPTpsUQ
 
 # Program Information 
 ## Program Information
