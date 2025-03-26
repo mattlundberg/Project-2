@@ -33,12 +33,13 @@ Our proposal is to create a machine learning model that helps you predict whethe
 [Ready? Set? Wait.](https://docs.google.com/presentation/d/1pJ8xgxxK05_RRqku2S9UNKVRdpPeZABSz4UzP7nNt7k/edit?usp=sharing)
 
 ## Data sets
-[Airplane Data](https://www.kaggle.com/datasets/patrickzel/flight-delay-and-cancellation-dataset-2019-2023)
+[Flight Data](https://www.kaggle.com/datasets/patrickzel/flight-delay-and-cancellation-dataset-2019-2023)
 
 ## Future Research Questions and Issues
 - During development, we discovered a gap in our Airplane Data for the year 2024. After assessing the situation, we determined that incorporating this missing data would exceed our project timeline. For future iterations, we recommend including the 2024 data to ensure the model is trained on the most current and comprehensive information available. This update would enhance the accuracy and reliability of our predictions.
 - Due to the paywall limits of the NOAA weather, we were unable to pull all of the historical data we would have needed to integrate the weather into our model. Future iterations would see us using that data.
 - During development we found that there was some awesome categorical data within the kaggle set such as the reason why a flight was delayed that would be interesting to utilize. The time restrictions for this project and hardware memory limits made more nuanced and complicated model training impossible.
+- Found that due to improvements within the airline industry delayed flights are uncommon. We would love to look into adapting this model to a neural network in the future to handle multiple targets to see if cancellations or diverted flights influence the probablilities.
 
 # Program Information 
 ## Program Information
