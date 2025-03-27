@@ -76,6 +76,14 @@ def prepare_and_predict(airline, origin, departure_date):
         origin=origin_code
     )
 
+def autocomplete_airport(event):
+    value = event.widget.get()
+    if value == '':
+        origin_combobox['values'] = airports
+    else:
+        filtered_airports = [airport for airport in airports if value.lower() in airport.lower()]
+        origin_combobox['values'] = filtered_airports
+
 # GUI Setup
 root = tk.Tk()
 root.title("Flight Delay Predictor")
@@ -92,9 +100,10 @@ departure_date_cal.set_date(datetime.today())
 departure_date_cal.grid(row=1, column=1, padx=5, pady=5)
 
 ttk.Label(root, text="Origin Airport:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
-origin_combobox = ttk.Combobox(root, values=airports, state="readonly")
-origin_combobox.set("Select airport")
+origin_combobox = ttk.Combobox(root, values=airports)
+origin_combobox.set("Type or select airport")
 origin_combobox.grid(row=2, column=1, padx=5, pady=5)
+origin_combobox.bind('<KeyRelease>', autocomplete_airport)
 
 # Prediction Button
 ttk.Button(root, text="Predict Flight", command=predict_flight).grid(row=3, column=0, columnspan=2, pady=10)
