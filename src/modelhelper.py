@@ -55,6 +55,8 @@ class ModelHelper:
         self.has_flight_dataset = False
         self.logger = logger
         self.model = None
+        self.airlinedelay = None
+        self.airportdelay = None
 
     def _get_model_config(self, model_type: str, task: str) -> Dict[str, Any]:
         """Get model configuration based on type and task."""
@@ -203,10 +205,28 @@ class ModelHelper:
         ]
         return df.drop(columns=[col for col in columns_to_drop if col in df.columns])
 
+    def _calculate_delay_statistics(self, df: pd.DataFrame) -> None:
+        """
+        Calculate and store mean delay statistics by airline and origin airport.
+        
+        Args:
+            df (pd.DataFrame): Input dataframe containing flight data
+        """
+        # Calculate mean delay by airline
+        self.airlinedelay = df.groupby('AIRLINE')['DEP_DELAY'].mean().to_dict()
+        self.logger.info(f"Calculated mean delays for {len(self.airlinedelay)} airlines")
+        
+        # Calculate mean delay by origin airport
+        self.airportdelay = df.groupby('ORIGIN')['DEP_DELAY'].mean().to_dict()
+        self.logger.info(f"Calculated mean delays for {len(self.airportdelay)} airports")
+
     def prepare_flight_dataset(self, df: pd.DataFrame) -> pd.DataFrame:
         """Prepare the flight dataset for modeling."""
         self.logger.info("Optimizing flight dataset data types...")
         df = self._optimize_flight_dataset_dtypes(df)
+
+        self.logger.info("Calculating delay statistics...")
+        self._calculate_delay_statistics(df)
         
         self.logger.info("Performing feature engineering...")
         df = self._prepare_features(df, 'DELAY_CATEGORY')
@@ -242,12 +262,33 @@ class ModelHelper:
         return model
 
     def predict(self, airline: str, departure_date: str, origin: str) -> str:
-        """Make predictions for a specific flight."""
+        """
+        Make predictions for a specific flight.
+        
+        Args:
+            airline (str): Airline name
+            departure_date (str): Date of departure
+            origin (str): Origin airport code
+            
+        Returns:
+            str: Predicted delay category ('Early', 'On Time', or 'Delayed')
+        """
+        if self.model is None:
+            raise ValueError("No model has been trained or loaded. Please train or load a model first.")
+        # Get airline and airport delay statistics
+        airline_delay = self.airlinedelay.get(airline, 0)
+        airport_delay = self.airportdelay.get(origin, 0)
+        
+        # Calculate average delay
+        total_delay = np.mean([airline_delay, airport_delay])
+        self.logger.info(f"Airline delay: {airline_delay}, Airport delay: {airport_delay}, Total delay: {total_delay}")
+        
+        # Create input data
         input_data = pd.DataFrame({
             'AIRLINE': [airline],
             'ORIGIN': [origin],
             'DAY_OF_WEEK': [pd.to_datetime(departure_date).dayofweek],
-            'TOTAL_DELAY': [0]
+            'TOTAL_DELAY': [total_delay]
         })
         
         # Encode categorical features
@@ -259,16 +300,18 @@ class ModelHelper:
                     self.logger.warning(f"Unknown {col}: {input_data[col].iloc[0]}")
                     input_data[col] = 0
         
-        # Scale numerical features
-        numerical_cols = input_data.select_dtypes(include=[np.number]).columns
-        if len(numerical_cols) > 0:
-            input_data[numerical_cols] = self.scaler.transform(input_data[numerical_cols])
+        # Scale numerical features only for logistic regression
+        if isinstance(self.model, LogisticRegression):
+            self.logger.info("Applying scaling for logistic regression prediction")
+            numerical_cols = input_data.select_dtypes(include=[np.number]).columns
+            if len(numerical_cols) > 0:
+                input_data[numerical_cols] = self.scaler.transform(input_data[numerical_cols])
         
         # Make prediction
         prediction = self.model.predict(input_data)[0]
         
         # Convert numeric prediction to category
-        if hasattr(self.label_encoders, 'DELAY_CATEGORY'):
+        if 'DELAY_CATEGORY' in self.label_encoders:
             prediction = self.label_encoders['DELAY_CATEGORY'].inverse_transform([prediction])[0]
         
         return prediction
