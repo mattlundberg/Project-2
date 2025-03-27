@@ -104,7 +104,7 @@ prediction_label = tk.Label(root, text="", font= ("Arial", 10, "bold"))
 prediction_label.grid(row=4, column=0, columnspan=2, pady=(10))
 
 # Model Information Display
-model_info_header_label = ttk.Label(root, text="Model Information:",font=("Arial", 8))
+model_info_header_label = ttk.Label(root, text="Model Information:",font=("Arial", 10))
 model_info_header_label.grid(row=5, column=0, columnspan=2, padx=5, pady=(10, 0))
 
 model_info_label = tk.Label(root, text=model_info_str, wraplength=400, justify="left")
