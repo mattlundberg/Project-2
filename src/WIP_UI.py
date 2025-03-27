@@ -10,12 +10,14 @@ print("Loading Model")
 model_helper = ModelHelper()
 model, model_scores = model_helper.train_flight_delay_model('logistic_regression')
 
+print(model_scores)
+
 # Format the output of `print(model)` for display
-model_info_str = f"Model Type: Logistic Regression\n\nModel Scores:\n" \
-                 f"Accuracy: {model_scores['accuracy']:.4f}\n" \
-                 f"Precision: {model_scores['precision']:.4f}\n" \
-                 f"Recall: {model_scores['recall']:.4f}\n" \
-                 f"F1 Score: {model_scores['f1']:.4f}"
+model_info_str = f"Model Type:\n  Logistic Regression\n\nModel Scores:\n" \
+                 f"  Accuracy: {model_scores['accuracy']:.4f}\n" \
+                 f"  Precision: {model_scores['precision']:.4f}\n" \
+                 f"  Recall: {model_scores['recall']:.4f}\n" \
+                 f"  F1 Score: {model_scores['f1']:.4f}"
 
 print("Loading Airlines")
 airlines = model_helper.flight_dataset['AIRLINE'].unique().tolist()
@@ -101,11 +103,11 @@ ttk.Button(root, text="Predict Flight", command=predict_flight).grid(row=3, colu
 prediction_label = tk.Label(root, text="", font= ("Arial", 10, "bold"))
 prediction_label.grid(row=4, column=0, columnspan=2, pady=(10))
 
-# Model Information Display (default on load)
-model_info_header_label = ttk.Label(root, text="Model Information:")
+# Model Information Display
+model_info_header_label = ttk.Label(root, text="Model Information:",font=("Arial", 8))
 model_info_header_label.grid(row=5, column=0, columnspan=2, padx=5, pady=(10, 0))
 
 model_info_label = tk.Label(root, text=model_info_str, wraplength=400, justify="left")
-model_info_label.grid(row=6, column=0, columnspan=2, padx=5, pady=(0, 10))
+model_info_label.grid(row=6, column=0, columnspan=2, padx=(10,0), pady=(0, 10), sticky="w")
 
 root.mainloop()
