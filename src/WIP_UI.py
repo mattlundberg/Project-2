@@ -3,21 +3,26 @@ from tkinter import ttk
 from tkcalendar import DateEntry
 import pandas as pd
 from datetime import datetime
-from modelhelper import ModelHelper  # Import the ModelHelper class 
+from modelhelper import ModelHelper
 
-print("Loading Airports")
-
-# Load airports from CSV
-airport_df = pd.read_csv('airports.csv')
-airports = airport_df['AIRPORT'].tolist()
-
-print("Loading Airlines")
-# Define airlines for dropdown
-airlines = ['Southwest Airlines Co.', 'Delta Air Lines Inc.', 'American Airlines Inc.', 'Spirit Air Lines', 'Allegiant Air']
-
+## Initialize ModelHelper and train the model
 print("Loading Model")
 model_helper = ModelHelper()
-model = model_helper.iniztialize_model('logistic_regression','classification')
+model, model_scores = model_helper.train_flight_delay_model('logistic_regression')
+
+# Format the output of `print(model)` for display
+model_info_str = f"Model Type: Logistic Regression\n\nModel Scores:\n" \
+                 f"Accuracy: {model_scores['accuracy']:.4f}\n" \
+                 f"Precision: {model_scores['precision']:.4f}\n" \
+                 f"Recall: {model_scores['recall']:.4f}\n" \
+                 f"F1 Score: {model_scores['f1']:.4f}"
+
+print("Loading Airlines")
+airlines = model_helper.flight_dataset['AIRLINE'].unique().tolist()
+
+print("Loading Airports")
+airport_df = pd.read_csv('airports.csv')
+airports = airport_df['AIRPORT'].tolist()
 
 def predict_flight():
     # Get input values from GUI
@@ -25,76 +30,82 @@ def predict_flight():
     departure_date = departure_date_cal.get_date()
     origin = origin_combobox.get()
 
-    # Call the prepare_and_predict function
-    prediction = prepare_and_predict(airline, origin, departure_date)
+    # Update UI with prediction and scores
+    display_sequential_messages(airline, departure_date, origin)
 
-    # Update result labels
-    result_label.config(text=f"Flight Status Prediction: {prediction.capitalize()}")
+def display_sequential_messages(airline, departure_date, origin):
+    def show_message(message, next_step=None):
+        prediction_label.config(text=message)
+        if next_step:
+            root.after(1500, next_step)  # Wait 1.5 seconds before calling the next step
 
+    def input_departure_date():
+        show_message("Inputting Departure Date...", input_origin_airport)
+
+    def input_origin_airport():
+        show_message("Inputting Origin Airport...", display_results)
+
+    def display_results():
+        # Call the prepare_and_predict function and show the results
+        prediction = prepare_and_predict(airline, origin, departure_date)
+        prediction_label.config(text=f"Your flight is likely to be: \n{prediction.capitalize()}")
+
+    # Start with the first message
+    show_message("Inputting Airline...", input_departure_date)
+
+def reset_prediction():
+    prediction_label.config(text="")
+    prediction_label.config(text="")  # Clear any intermediate messages as well
 
 def prepare_and_predict(airline, origin, departure_date):
-    # Create a dataframe from the inputs
-    input_df = pd.DataFrame({
-        'ORIGIN': [origin]
-    })
-
-    # Load the transformation mapping from CSV
+    # Transform origin to airport code
     airports_df = pd.read_csv('airports.csv')
-
-    # Create a mapping dictionary from AIRPORT_NAME to AIRPORT_CODE
     airport_mapping = dict(zip(airports_df['AIRPORT'], airports_df['Airport Code']))
+    
+    if origin not in airport_mapping:
+        raise ValueError(f"Origin airport '{origin}' not found in database")
+        
+    origin_code = airport_mapping[origin]
+    
+    # Make prediction
+    return model_helper.predict(
+        airline=airline,
+        departure_date=departure_date,
+        origin=origin_code
+    )
 
-    # Transform the ORIGIN to AIRPORT_CODE
-    if origin in airport_mapping:
-        input_df['ORIGIN'] = airport_mapping[origin]
-    else:
-        raise ValueError(f"Origin airport '{origin}' not found in the airports database.")
-
-    # Make prediction using the ML model
-    prediction = model_helper.predict(model=model, airline=airline, departure_date=departure_date, origin=input_df['ORIGIN'].iloc[0])    return prediction
-
-    # Used for testing output
-    #test = print(input_df)
-    #return test
-
-# Create main window
+# GUI Setup
 root = tk.Tk()
-root.title("Flight Prediction")
+root.title("Flight Delay Predictor")
 
-# Create input fields
-airline_label = ttk.Label(root, text="Airline:")
+# Input Fields
+ttk.Label(root, text="Airline:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
 airline_combobox = ttk.Combobox(root, values=airlines, state="readonly")
-airline_combobox.set("Select an airline")  # Set default text
-
-departure_date_label = ttk.Label(root, text="Departure Date:")
-departure_date_cal = DateEntry(root, width=12, background='darkblue',
-                               foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd',
-                               mindate=datetime.today())
-
-departure_date_cal.set_date(datetime.today().strftime('%Y-%m-%d'))  # Set initial date to today
-
-origin_label = ttk.Label(root, text="Origin Airport:")
-origin_combobox = ttk.Combobox(root, values=airports, state="readonly")
-origin_combobox.set("Select origin airport")  # Set default text
-
-# Create predict button
-predict_button = ttk.Button(root, text="Predict Flight", command=predict_flight)
-
-# Create result labels
-result_label = ttk.Label(root, text="Your Flight Is Likely To Be: ")
-
-# Layout widget parameters
-airline_label.grid(row=0, column=0, padx=5, pady=5, sticky="e")
+airline_combobox.set("Select airline")
 airline_combobox.grid(row=0, column=1, padx=5, pady=5)
 
-departure_date_label.grid(row=1, column=0, padx=5, pady=5, sticky="e")
+ttk.Label(root, text="Departure Date:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+departure_date_cal = DateEntry(root, date_pattern='yyyy-mm-dd', mindate=datetime.today())
+departure_date_cal.set_date(datetime.today())
 departure_date_cal.grid(row=1, column=1, padx=5, pady=5)
 
-origin_label.grid(row=2, column=0, padx=5, pady=5, sticky="e")
+ttk.Label(root, text="Origin Airport:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+origin_combobox = ttk.Combobox(root, values=airports, state="readonly")
+origin_combobox.set("Select airport")
 origin_combobox.grid(row=2, column=1, padx=5, pady=5)
 
-predict_button.grid(row=3, column=0, columnspan=2, padx=5, pady=10)
+# Prediction Button
+ttk.Button(root, text="Predict Flight", command=predict_flight).grid(row=3, column=0, columnspan=2, pady=10)
 
-result_label.grid(row=5, column=0, columnspan=2, padx=5, pady=5)
+# Results Display
+prediction_label = tk.Label(root, text="", font= ("Arial", 10, "bold"))
+prediction_label.grid(row=4, column=0, columnspan=2, pady=(10))
+
+# Model Information Display (default on load)
+model_info_header_label = ttk.Label(root, text="Model Information:")
+model_info_header_label.grid(row=5, column=0, columnspan=2, padx=5, pady=(10, 0))
+
+model_info_label = tk.Label(root, text=model_info_str, wraplength=400, justify="left")
+model_info_label.grid(row=6, column=0, columnspan=2, padx=5, pady=(0, 10))
 
 root.mainloop()
