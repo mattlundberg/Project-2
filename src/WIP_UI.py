@@ -10,8 +10,6 @@ print("Loading Model")
 model_helper = ModelHelper()
 model, model_scores = model_helper.train_flight_delay_model('logistic_regression')
 
-print(model_scores)
-
 # Format the output of `print(model)` for display
 model_info_str = f"Model Type:\n  Logistic Regression\n\nModel Scores:\n" \
                  f"  Accuracy: {model_scores['accuracy']:.4f}\n" \
