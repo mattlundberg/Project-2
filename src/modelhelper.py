@@ -2,26 +2,22 @@
 import os
 import logging
 import pickle
-import warnings
-from typing import Union, Tuple, Optional, Dict, Any, List
+from typing import Union, Tuple, Dict, Any
 
 # Third-party imports
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import kagglehub
 import kagglehub.auth
 from dotenv import load_dotenv
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
-from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.svm import SVC, SVR
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    mean_squared_error, r2_score
+    accuracy_score, precision_score, recall_score, f1_score
 )
 
 # Configure logging
