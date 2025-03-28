@@ -52,11 +52,14 @@ class ModelHelper:
         self.label_encoders: Dict[str, LabelEncoder] = {}
         self.imputer = None
         self.flight_dataset = None
+        self.original_flight_dataset = None
         self.has_flight_dataset = False
         self.logger = logger
         self.model = None
         self.airlinedelay = None
         self.airportdelay = None
+        self.xdata = None
+        self.ydata = None
 
     def _get_model_config(self, model_type: str, task: str) -> Dict[str, Any]:
         """Get model configuration based on type and task."""
@@ -222,6 +225,7 @@ class ModelHelper:
 
     def prepare_flight_dataset(self, df: pd.DataFrame) -> pd.DataFrame:
         """Prepare the flight dataset for modeling."""
+
         self.logger.info("Optimizing flight dataset data types...")
         df = self._optimize_flight_dataset_dtypes(df)
 
@@ -281,7 +285,7 @@ class ModelHelper:
         
         # Calculate average delay
         total_delay = np.mean([airline_delay, airport_delay])
-        self.logger.info(f"Airline delay: {airline_delay}, Airport delay: {airport_delay}, Total delay: {total_delay}")
+        self.logger.info(f"Airline delay: {airline} {airline_delay}, Airport delay: {origin} {airport_delay}, Total delay: {total_delay}")
         
         # Create input data
         input_data = pd.DataFrame({
@@ -439,12 +443,18 @@ class ModelHelper:
         Returns:
             pd.DataFrame: Loaded dataset
         """
+
+        if self.flight_dataset is not None:
+            self.logger.info("Flight dataset is already loaded and optimized")
+            return self.flight_dataset
+        
         df = self.flight_dataset
 
         if not self.has_flight_dataset:
             print("Fetching flight dataset from Kaggle...")
             df = self.fetch_dataset(os.environ['KAGGLE_FLIGHT_FILE_PATH'], os.environ['KAGGLE_FLIGHT_FILE_NAME'])
             print("Preparing flight dataset...")
+            self.original_flight_dataset = df.copy()
             df_optmized = self.prepare_flight_dataset(df)
             self.has_flight_dataset = True
 
@@ -480,23 +490,31 @@ class ModelHelper:
         """
         self.logger.info("Starting flight delay model training process...")
         
-        # Step 1: Fetch and prepare the dataset
-        self.logger.info("Step 1: Fetching and preparing the dataset...")
-        df = self.fetch_flight_dataset()
-        self.logger.info(f"Dataset shape: {df.shape}")
-        
-        # Step 2: Prepare features and target
-        self.logger.info("Step 2: Preparing features and target...")
-        X = df.drop(columns=['DELAY_CATEGORY'])
-        y = df['DELAY_CATEGORY']
+        if self.flight_dataset is None:
+            # Step 1: Fetch and prepare the dataset
+            self.logger.info("Step 1: Fetching and preparing the dataset...")
+            df = self.fetch_flight_dataset()
+            self.logger.info(f"Dataset shape: {df.shape}")
+            
+            # Step 2: Prepare features and target
+            self.logger.info("Step 2: Preparing features and target...")
+            X = df.drop(columns=['DELAY_CATEGORY'])
+            y = df['DELAY_CATEGORY']
+
+            #Save the data for later use and to avoid issues when fetching a already loaded dataset.
+            self.xdata = X.copy()   
+            self.ydata = y.copy() 
+        else:
+            self.logger.info("Flight dataset is already loaded. Using the loaded dataset...")
+            df = self.flight_dataset 
         
         # Log original features for reference
-        self.logger.info(f"Features being used: {X.columns.tolist()}")
+        self.logger.info(f"Features being used: {self.xdata.columns.tolist()}")
         
         # Step 3: Split the data
         self.logger.info(f"Step 3: Splitting data into train/test sets (test_size={test_size})...")
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=self.random_state
+            self.xdata, self.ydata, test_size=test_size, random_state=self.random_state
         )
         self.logger.info(f"Training set shape: {X_train.shape}")
         self.logger.info(f"Test set shape: {X_test.shape}")
