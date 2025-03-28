@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-DEFAULT_RANDOM_STATE = 42
+DEFAULT_RANDOM_STATE = 32
 CUTOFF_DATE = '2021-06-15'
 DELAY_BINS = [-np.inf, -15, 15, np.inf]
 DELAY_LABELS = ['Early', 'On Time', 'Delayed']
@@ -246,6 +246,13 @@ class ModelHelper:
     def train_model(self, X_train: Union[pd.DataFrame, np.ndarray], y_train: pd.Series,
                    model_type: str = 'random_forest', task: str = 'classification') -> Any:
         """Train a specified model on the prepared data."""
+
+        #Check to see if there is a model already trained and loaded.
+        self.model = self.load_model(f"{model_type}_flight_delay_model")
+        if self.model is not None:
+            self.logger.info(f"Model {model_type} already trained and loaded. Using the loaded model...")
+            return self.model
+
         models = self._get_model_config(model_type, task)
         
         if model_type not in models:
@@ -534,7 +541,7 @@ class ModelHelper:
             self.logger.error(f"Error fetching dataset: {str(e)}")
             raise
 
-    def train_flight_delay_model(self, model_type: str = 'logistic_regression', test_size: float = 0.2) -> Tuple[Any, Dict[str, float]]:
+    def train_flight_delay_model(self, model_type: str = 'logistic_regression', test_size: float = 0.2, force_train: bool = False) -> Tuple[Any, Dict[str, float]]:
         """
         Orchestrate the complete process of retrieving data and training a flight delay prediction model.
         """
@@ -560,7 +567,7 @@ class ModelHelper:
         
         # Log original features for reference
         self.logger.info(f"Features being used: {self.xdata.columns.tolist()}")
-        
+
         # Step 3: Split the data
         self.logger.info(f"Step 3: Splitting data into train/test sets (test_size={test_size})...")
         X_train, X_test, y_train, y_test = train_test_split(
@@ -579,7 +586,7 @@ class ModelHelper:
         if model_type == 'logistic_regression':
             X_train_processed = self.scaler.fit_transform(X_train_processed)
             X_test_processed = self.scaler.transform(X_test_processed)
-        
+
         # Step 5: Train the model
         self.logger.info(f"Step 5: Training {model_type} model...")
         model = self.train_model(X_train_processed, y_train, model_type=model_type)
