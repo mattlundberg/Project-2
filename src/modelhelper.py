@@ -386,23 +386,28 @@ class ModelHelper:
         Args:
             model (Any): Trained model object to save
             model_name (str): Name to give the saved model file
+            
+        Raises:
+            Exception: If there is an error saving the model
         """
         import os
+        
+        # Ensure model name has .pkl extension
+        model_name = f"{model_name}.pkl" if not model_name.endswith('.pkl') else model_name
+        
+        # Construct full path to save model
+        model_path = os.path.join('models', model_name)
         
         # Create models directory if it doesn't exist
         os.makedirs('models', exist_ok=True)
         
-        # Add .pkl extension if not provided
-        if not model_name.endswith('.pkl'):
-            model_name += '.pkl'
-            
-        model_path = os.path.join('models', model_name)
-        
         try:
-            with open(model_path, 'wb') as f:
-                pickle.dump(model, f)
+            # Save model using pickle serialization
+            with open(model_path, 'wb') as model_file:
+                pickle.dump(model, model_file)
             self.logger.info(f"Model successfully saved to {model_path}")
         except Exception as e:
+            # Log and re-raise any errors that occur during saving
             self.logger.error(f"Error saving model to {model_path}: {str(e)}")
             raise
 
@@ -415,74 +420,119 @@ class ModelHelper:
             
         Returns:
             Any: Loaded model object
-        """ 
+            
+        Raises:
+            FileNotFoundError: If model file cannot be found
+            pickle.UnpicklingError: If model file is corrupted
+        """
         import os
-
-        # Create models directory if it doesn't exist
-        os.makedirs('models', exist_ok=True)    
-
-        # Add .pkl extension if not provided
-        if not model_name.endswith('.pkl'):
-            model_name += '.pkl'
-
-        model_path = os.path.join('models', model_name) 
-
+        
+        # Ensure model name has .pkl extension by appending if needed
+        model_name = f"{model_name}.pkl" if not model_name.endswith('.pkl') else model_name
+        
+        # Construct full path to model file in models directory
+        model_path = os.path.join('models', model_name)
+        
+        # Create models directory if it doesn't exist yet
+        # exist_ok=True prevents errors if directory already exists
+        os.makedirs('models', exist_ok=True)
+        
         try:
-            with open(model_path, 'rb') as f:
-                model = pickle.load(f)
-            self.logger.info(f"Model successfully loaded from {model_path}")
-            return model        
+            # Open model file in binary read mode and deserialize using pickle
+            with open(model_path, 'rb') as model_file:
+                # Load the model object from the file
+                model = pickle.load(model_file)
+                # Log successful load
+                self.logger.info(f"Model successfully loaded from {model_path}")
+                return model
+                
+        except FileNotFoundError:
+            # Handle case where model file doesn't exist
+            self.logger.error(f"Model file not found at {model_path}")
+            raise
+        except pickle.UnpicklingError as e:
+            # Handle corrupted or invalid pickle file
+            self.logger.error(f"Error unpickling model from {model_path}: {str(e)}")
+            raise
         except Exception as e:
-            self.logger.error(f"Error loading model from {model_path}: {str(e)}")
-            raise  
+            # Catch any other unexpected errors
+            self.logger.error(f"Unexpected error loading model from {model_path}: {str(e)}")
+            raise
 
     def fetch_flight_dataset(self) -> pd.DataFrame:
         """
-        Fetch flight dataset from Kaggle using kagglehub.
+        Fetch flight dataset from Kaggle using kagglehub and prepare it for modeling.
         
         Returns:
-            pd.DataFrame: Loaded dataset
+            pd.DataFrame: Loaded and prepared dataset
+            
+        Flow:
+        1. Check if dataset is already cached in memory
+        2. If not cached, fetch from Kaggle and prepare it
+        3. Store both original and prepared versions
+        4. Return the prepared dataset
         """
-
+        # First check if we already have the dataset loaded in memory
+        # This prevents unnecessary re-downloading and processing
         if self.flight_dataset is not None:
-            self.logger.info("Flight dataset is already loaded and optimized")
+            self.logger.info("Using cached flight dataset")
             return self.flight_dataset
-        
-        df = self.flight_dataset
 
+        # Only fetch and prepare if we haven't done so already
+        # This is tracked by the has_flight_dataset flag
         if not self.has_flight_dataset:
-            print("Fetching flight dataset from Kaggle...")
-            df = self.fetch_dataset(os.environ['KAGGLE_FLIGHT_FILE_PATH'], os.environ['KAGGLE_FLIGHT_FILE_NAME'])
-            print("Preparing flight dataset...")
+            self.logger.info("Fetching flight dataset from Kaggle...")
+            # Get dataset from Kaggle using environment variables for path/filename
+            df = self.fetch_dataset(
+                os.environ['KAGGLE_FLIGHT_FILE_PATH'],
+                os.environ['KAGGLE_FLIGHT_FILE_NAME']
+            )
+            
+            self.logger.info("Preparing flight dataset...")
+            # Store original version before any preprocessing
             self.original_flight_dataset = df.copy()
-            df_optmized = self.prepare_flight_dataset(df)
+            # Process the dataset using prepare_flight_dataset method
+            prepared_df = self.prepare_flight_dataset(df)
+            
+            # Cache both the prepared dataset and set flag
+            self.flight_dataset = prepared_df
             self.has_flight_dataset = True
 
-        self.flight_dataset = df
-
+        # Final validation check - dataset should never be None at this point
+        # If it is, something went wrong in the fetch/prepare process
         if self.flight_dataset is None:
-            raise ValueError("Flight dataset not found.")
-        
-        return df_optmized
+            raise ValueError("Failed to load flight dataset")
+            
+        return self.flight_dataset
 
     def fetch_dataset(self, file_path: str, file_name: str) -> pd.DataFrame:
         """
         Fetch dataset from Kaggle using kagglehub.
         
+        Args:
+            file_path (str): Path to the Kaggle dataset
+            file_name (str): Name of the file to download
+            
         Returns:
             pd.DataFrame: Loaded dataset
+            
+        Raises:
+            FileNotFoundError: If dataset cannot be found or downloaded
+            pd.errors.EmptyDataError: If the CSV file is empty
         """
-        # Load environment variables
         load_dotenv()
         
-        # Download latest version
-        path = kagglehub.dataset_download(
-            file_path
-        )
-        path = path + '/' + file_name
-
-        # Load dataset
-        return pd.read_csv(path, engine='python')    
+        try:
+            # Download dataset and construct full path
+            download_path = kagglehub.dataset_download(file_path)
+            full_path = os.path.join(download_path, file_name)
+            
+            # Load and return the dataset
+            return pd.read_csv(full_path, engine='python')
+            
+        except Exception as e:
+            self.logger.error(f"Error fetching dataset: {str(e)}")
+            raise
 
     def train_flight_delay_model(self, model_type: str = 'logistic_regression', test_size: float = 0.2) -> Tuple[Any, Dict[str, float]]:
         """
