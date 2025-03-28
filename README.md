@@ -19,10 +19,10 @@ Join our Slack channel for project discussions and updates:
 | Data Fetching & Clean Up | 3/20/25 | Complete |
 | Data Exploration & Build | 3/24/25 | Complete |
 | Model Selection | 3/25/25 | Complete |
-| Model/UI Connection | 3/25/25 | In Progress |
-| Testing | Ad Hoc | In Progress |
-| Finalize Documentation | 3/27/25 | To Do |
-| Create Presentation | 3/27/25 | To Do |
+| Model/UI Connection | 3/25/25 | Complete |
+| Testing | Ad Hoc | Complete |
+| Finalize Documentation | 3/27/25 | In Progress |
+| Create Presentation | 3/27/25 | Complete |
 
 ## Proposal
 Air travel: where the thrill of soaring 35,000 feet in the air is matched only by the agony of waiting on the ground for your delayed flight. It's like being a contestant in a real-life game of "Will I Make My Connection?"—except instead of prizes, you win stress and a possible overnight stay in an airport lounge.
