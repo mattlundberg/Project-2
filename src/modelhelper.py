@@ -244,12 +244,12 @@ class ModelHelper:
         return df
 
     def train_model(self, X_train: Union[pd.DataFrame, np.ndarray], y_train: pd.Series,
-                   model_type: str = 'random_forest', task: str = 'classification') -> Any:
+                   model_type: str = 'random_forest', task: str = 'classification', force_train: bool = False) -> Any:
         """Train a specified model on the prepared data."""
 
         #Check to see if there is a model already trained and loaded.
         self.model = self.load_model(f"{model_type}_flight_delay_model")
-        if self.model is not None:
+        if self.model is not None and not force_train:
             self.logger.info(f"Model {model_type} already trained and loaded. Using the loaded model...")
             return self.model
 
@@ -589,7 +589,7 @@ class ModelHelper:
 
         # Step 5: Train the model
         self.logger.info(f"Step 5: Training {model_type} model...")
-        model = self.train_model(X_train_processed, y_train, model_type=model_type)
+        model = self.train_model(X_train_processed, y_train, model_type=model_type, force_train=force_train)
         self.model = model
         
         # Step 6: Evaluate the model
