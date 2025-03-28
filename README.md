@@ -41,113 +41,42 @@ Our proposal is to create a machine learning model that helps you predict whethe
 - During development we found that there was some awesome categorical data within the kaggle set such as the reason why a flight was delayed that would be interesting to utilize. The time restrictions for this project and hardware memory limits made more nuanced and complicated model training impossible.
 - Found that due to improvements within the airline industry delayed flights are uncommon. We would love to look into adapting this model to a neural network in the future to handle multiple targets to see if cancellations or diverted flights influence the probablilities.
 
-# Program Information 
-## Program Information
-- TBD
+# Program Information
+
+## Overview
+This program is a flight delay prediction system that uses machine learning to forecast whether flights will be delayed based on historical flight data. It provides both a model training pipeline and prediction capabilities through a simple API interface.
+
+### Core Features
+- Flight delay prediction using airline, date, and origin airport
+- Support for multiple ML models (Random Forest, Logistic Regression, XGBoost)
+- Automated data preprocessing and feature engineering
+- Model performance evaluation and metrics tracking
+- Efficient handling of large flight datasets
+- Built-in data validation and error handling
+- Model persistence and loading capabilities
+- Comprehensive logging system
 
 ### Programming Languages
-- Python 3.x
+- Python 3.11+
 
 ### Required Libraries/Dependencies
-- requests>=2.31.0
-- pandas>=2.1.0
-- python-dotenv>=1.0.0
-- pytest>=7.4.0
-- openpyxl>=3.1.2 (for Excel support)
+All dependencies are listed in requirements.txt and include:
+- pandas>=2.1.0 - Data manipulation and analysis
+- numpy>=1.24.0 - Numerical computing
+- scikit-learn>=1.3.0 - Machine learning algorithms
+- imbalanced-learn>=0.11.0 - Handling imbalanced datasets
+- xgboost>=2.0.0, lightgbm>=4.1.0 - Gradient boosting implementations
+- matplotlib>=3.7.0, seaborn>=0.12.0 - Data visualization
+- kagglehub[pandas-datasets]>=0.1.0 - Kaggle dataset access
+- python-dotenv>=1.0.0 - Environment variable management
+- pytest>=7.4.0 - Testing framework
 
 ### Development Environment
-- Python 3.x
+- Python 3.11+
 - Git for version control
 - Virtual environment (recommended)
+- Jupyter notebooks for analysis and visualization
 
 ### Project Structure
-```
-project/
-├── src/
-│   ├── __init__.py
-│   ├── helperclasses.py    # Data fetching classes
-│   ├── modelhelper.py      # Machine learning helper
-│   └── config.py          # Configuration management
-├── test/
-│   ├── __init__.py
-│   ├── test_helperclasses.py
-│   └── test_modelhelper.py
-├── data/                  # Directory for downloaded data
-├── .env                   # Environment variables
-├── .gitignore
-├── requirements.txt
-└── README.md
-```
-
-### Data Fetching Classes
-
-#### DataFetcherAPI
-A class for fetching and processing data from APIs with built-in error handling, rate limiting, and data validation.
-
-Features:
-- Rate limiting support
-- Automatic retry logic
-- Multiple response formats (JSON, DataFrame, List)
-- Pagination support
-- File saving capabilities
-- Request statistics tracking
-
-Example usage:
-```python
-from src.helperclasses import DataFetcherAPI
-
-# Initialize the fetcher
-fetcher = DataFetcherAPI(
-    base_url='https://api.example.com',
-    api_key='your_api_key',
-    rate_limit=60
-)
-
-# Fetch data
-data = fetcher.fetch_data(
-    endpoint='users',
-    response_format='dataframe'
-)
-
-# Save to file
-fetcher.save_to_file(data, 'users.csv', format='csv')
-```
-
-#### DataFetcherCurl
-A class for fetching data using cURL commands with built-in error handling and rate limiting.
-
-Features:
-- Execute cURL commands with retry logic
-- Support for various output formats
-- File download capabilities
-- Rate limiting
-- Comprehensive error handling
-- Request statistics tracking
-
-Example usage:
-```python
-from src.helperclasses import DataFetcherCurl
-
-# Initialize the fetcher
-fetcher = DataFetcherCurl(
-    output_dir='data',
-    rate_limit=60
-)
-
-# Fetch data using cURL
-data = fetcher.fetch_data(
-    curl_command='curl -H "Authorization: Bearer token" https://api.example.com/data',
-    output_format='json'
-)
-
-# Download a file
-file_path = fetcher.fetch_file(
-    curl_command='curl https://example.com/file.zip',
-    output_file='file.zip'
-)
-```
-
-### Overview and Analysis
-#### Proposal
 TBD
 
