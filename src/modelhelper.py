@@ -64,31 +64,39 @@ class ModelHelper:
             return {
                 'random_forest': RandomForestClassifier(
                     random_state=self.random_state,
-                    n_estimators=100,
-                    max_depth=5,
-                    min_samples_split=20,
-                    min_samples_leaf=10,
+                    n_estimators=200,
+                    max_depth=10,
+                    min_samples_split=50,
+                    min_samples_leaf=20,
                     max_features='sqrt',
                     class_weight='balanced',
                     bootstrap=True,
-                    oob_score=True
+                    oob_score=True,
+                    n_jobs=-1
                 ),
                 'logistic_regression': LogisticRegression(
                     random_state=self.random_state,
-                    max_iter=2000,
+                    max_iter=1000,
                     class_weight='balanced',
-                    solver='saga',
+                    solver='lbfgs',
                     multi_class='multinomial',
-                    penalty='l1',
                     C=1.0,
-                    tol=1e-4
+                    tol=1e-3,
+                    n_jobs=-1,
+                    warm_start=True
                 ),
-                'svm': SVC(random_state=self.random_state),
+                'svm': SVC(
+                    random_state=self.random_state,
+                    kernel='rbf',
+                    class_weight='balanced',
+                    probability=True,
+                    cache_size=1000
+                ),
                 'decision_tree': DecisionTreeClassifier(
                     random_state=self.random_state,
-                    max_depth=10,
-                    min_samples_split=5,
-                    min_samples_leaf=2,
+                    max_depth=15,
+                    min_samples_split=10,
+                    min_samples_leaf=5,
                     class_weight='balanced',
                     criterion='gini'
                 )
@@ -175,25 +183,33 @@ class ModelHelper:
         Returns:
             pd.DataFrame: DataFrame with engineered features
         """
-        # Extract day of year from flight date for temporal patterns
+        # Extract time-based features
         df['DAY_OF_YEAR'] = pd.to_datetime(df['FL_DATE']).dt.dayofyear
+        df['DAY_OF_WEEK'] = pd.to_datetime(df['FL_DATE']).dt.dayofweek
         
-        # Categorize delays into Early/On Time/Delayed using predefined bins
-        df['DELAY_CATEGORY'] = pd.cut(
-            df['DEP_DELAY'], 
-            bins=DELAY_BINS,
-            labels=DELAY_LABELS
-        )
-        
-        # Create total delay feature
+        # Create delay features
         delay_columns = [
             'DELAY_DUE_CARRIER', 'DELAY_DUE_WEATHER', 
             'DELAY_DUE_NAS', 'DELAY_DUE_SECURITY', 
             'DELAY_DUE_LATE_AIRCRAFT'
         ]
+        
+        # Calculate various delay statistics
         df['TOTAL_DELAY'] = df[delay_columns].sum(axis=1)
-
-        # Drop delay columns
+        df['MAX_DELAY'] = df[delay_columns].max(axis=1)
+        df['DELAY_VARIANCE'] = df[delay_columns].var(axis=1)
+        
+        # Calculate historical delay patterns
+        df['HISTORICAL_DELAY'] = df.groupby(['AIRLINE', 'ORIGIN', 'DAY_OF_WEEK'])['TOTAL_DELAY'].transform('mean')
+        
+        # Define the target variable (DELAY_CATEGORY) based on DEP_DELAY
+        df['DELAY_CATEGORY'] = pd.cut(
+            df['DEP_DELAY'],
+            bins=DELAY_BINS,
+            labels=DELAY_LABELS
+        )
+        
+        # Drop original delay columns
         df.drop(columns=delay_columns, inplace=True)
         
         return df
@@ -207,7 +223,7 @@ class ModelHelper:
             'CRS_ELAPSED_TIME', 'AIR_TIME', 'DISTANCE', 'DEST',
             'DEST_CITY', 'ELAPSED_TIME', 'DEP_TIME', 'ORIGIN_CITY',
             'CANCELLED', 'CANCELLATION_CODE', 'DIVERTED', 'FL_DATE',
-            'DEP_DELAY'
+            'DEP_DELAY', 'DAY_OF_WEEK'
         ]
         return df.drop(columns=[col for col in columns_to_drop if col in df.columns])
 
@@ -277,16 +293,26 @@ class ModelHelper:
         day_of_year = pd.to_datetime(departure_date).dayofyear
 
         # Calculate total delay
-        total_delay = self._calculate_total_delay_by_day(day_of_year)
+        total_delay = self._calculate_total_delay_by_day(day_of_year, airline, origin)
+        
+        #Log to see the values
         self.logger.info(f"Airline: {airline}, Airport: {origin}, Total delay: {total_delay}")
 
-        # Create input data
+        # Create input data with all features in the same order as training
+        # Create input data with all required features
         input_data = pd.DataFrame({
             'AIRLINE': [airline],
-            'ORIGIN': [origin],
+            'ORIGIN': [origin], 
             'DAY_OF_YEAR': [day_of_year],
-            'TOTAL_DELAY': [total_delay]
+            'TOTAL_DELAY': [total_delay],
+            'MAX_DELAY': [total_delay], # Using total_delay as max since it's a single value
+            'DELAY_VARIANCE': [0.0], # Set to 0 for single prediction
+            'HISTORICAL_DELAY': [self._get_historical_delay(airline, origin)]
         })
+        
+        # Ensure feature order matches training data
+        if hasattr(self.model, 'feature_names_in_'):
+            input_data = input_data[self.model.feature_names_in_]
         
         # Encode categorical features
         for col in ['AIRLINE', 'ORIGIN']:
@@ -296,6 +322,9 @@ class ModelHelper:
                 except ValueError:
                     self.logger.warning(f"Unknown {col}: {input_data[col].iloc[0]}")
                     input_data[col] = 0
+        
+        # Handle NaN values
+        input_data = input_data.fillna(0)  # Fill NaN with 0 for numerical features
         
         # Scale numerical features only for logistic regression
         if isinstance(self.model, LogisticRegression):
@@ -442,15 +471,15 @@ class ModelHelper:
         except FileNotFoundError:
             # Handle case where model file doesn't exist
             self.logger.error(f"Model file not found at {model_path}")
-            raise
+            return None
         except pickle.UnpicklingError as e:
             # Handle corrupted or invalid pickle file
             self.logger.error(f"Error unpickling model from {model_path}: {str(e)}")
-            raise
+            return None
         except Exception as e:
             # Catch any other unexpected errors
             self.logger.error(f"Unexpected error loading model from {model_path}: {str(e)}")
-            raise
+            return None
 
     def fetch_flight_dataset(self, force_fetch: bool = False) -> pd.DataFrame:
         """
@@ -472,15 +501,14 @@ class ModelHelper:
             return self.flight_dataset
         
         #check if the dataset is already saved on the computer
+        if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'flight_dataset_original.csv')) and not force_fetch:
+            self.logger.info("Using original saved flight dataset")
+            self.original_flight_dataset = pd.read_csv(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'flight_dataset_original.csv'))
+            df = self.original_flight_dataset.copy()
         if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'flight_dataset.csv')) and not force_fetch:
             self.logger.info("Using saved flight dataset")
             self.flight_dataset = pd.read_csv(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'flight_dataset.csv'))
             return self.flight_dataset.copy()
-        
-        if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'flight_dataset_original.csv')) and not force_fetch:
-            self.logger.info("Using saved flight dataset")
-            self.original_flight_dataset = pd.read_csv(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'flight_dataset_original.csv'))
-            df = self.original_flight_dataset.copy()
 
 
         # Only fetch and prepare if we haven't done so already
@@ -494,8 +522,7 @@ class ModelHelper:
                     os.environ['KAGGLE_FLIGHT_FILE_PATH'],
                     os.environ['KAGGLE_FLIGHT_FILE_NAME']
                 )
-            else:
-                df = self.original_flight_dataset.copy()
+            
             
             self.logger.info("Preparing flight dataset...")
             # Store original version before any preprocessing
@@ -576,7 +603,7 @@ class ModelHelper:
             X = df.drop(columns=['DELAY_CATEGORY'])
             y = df['DELAY_CATEGORY']
 
-            #Save the data for later use and to avoid issues when fetching a already loaded dataset.
+            # Save the data for later use
             self.xdata = X.copy()   
             self.ydata = y.copy() 
         else:
@@ -586,24 +613,33 @@ class ModelHelper:
         # Log original features for reference
         self.logger.info(f"Features being used: {self.xdata.columns.tolist()}")
 
-        # Step 3: Split the data
+        # Step 3: Split the data with stratification
         self.logger.info(f"Step 3: Splitting data into train/test sets (test_size={test_size})...")
         X_train, X_test, y_train, y_test = train_test_split(
-            self.xdata, self.ydata, test_size=test_size, random_state=self.random_state
+            self.xdata, self.ydata, 
+            test_size=test_size, 
+            random_state=self.random_state,
+            stratify=self.ydata  # Ensure balanced split
         )
         self.logger.info(f"Training set shape: {X_train.shape}")
         self.logger.info(f"Test set shape: {X_test.shape}")
         
         # Step 4: Preprocess the data
         self.logger.info("Step 4: Preprocessing features...")
-        # First encode categorical features
+        
+        # Handle missing values
+        X_train = self._handle_missing_values(X_train)
+        X_test = self._handle_missing_values(X_test)
+        
+        # Encode categorical features
         X_train_processed = self._encode_categorical_features(X_train.copy())
         X_test_processed = self._encode_categorical_features(X_test.copy())
         
-        # Then scale if using logistic regression
-        if model_type == 'logistic_regression':
-            X_train_processed = self.scaler.fit_transform(X_train_processed)
-            X_test_processed = self.scaler.transform(X_test_processed)
+        # Scale numerical features
+        numerical_cols = X_train_processed.select_dtypes(include=[np.number]).columns
+        if len(numerical_cols) > 0:
+            X_train_processed[numerical_cols] = self.scaler.fit_transform(X_train_processed[numerical_cols])
+            X_test_processed[numerical_cols] = self.scaler.transform(X_test_processed[numerical_cols])
 
         # Step 5: Train the model
         self.logger.info(f"Step 5: Training {model_type} model...")
@@ -632,7 +668,7 @@ class ModelHelper:
         self.logger.info("\nModel training process completed successfully!")
         return model, metrics    
         
-    def _calculate_total_delay_by_day(self, day_of_year: int) -> float:
+    def _calculate_total_delay_by_day(self, day_of_year: int, airline: str, origin: str) -> float:
         """
         Calculate the mean total delay for a given day of the year from historical data.
         
@@ -664,9 +700,72 @@ class ModelHelper:
             'DELAY_DUE_LATE_AIRCRAFT'
         ]
         
-        total_delay = day_data[delay_columns].mean().mean()
+        # Filter for specific airline and origin
+        filtered_data = day_data[
+            (day_data['AIRLINE'] == airline) & 
+            (day_data['ORIGIN'] == origin)
+        ]
+        
+        # If no data for specific airline/origin, fall back to overall average
+        if filtered_data.empty:
+            total_delay = day_data[delay_columns].mean().mean()
+        else:
+            total_delay = filtered_data[delay_columns].mean().mean()
         
         self.logger.debug(f"Calculated total delay for day {day_of_year}: {total_delay:.2f}")
         return total_delay
 
-    
+    def _is_holiday(self, date: str) -> int:
+        """
+        Check if a given date is a holiday.
+        
+        Args:
+            date (str): Date in yyyy-mm-dd format
+            
+        Returns:
+            int: 1 if the date is a holiday, 0 otherwise
+        """
+        holidays = [
+            '2021-12-25', '2021-12-31', '2022-01-01', '2022-07-04', '2022-09-05',
+            '2022-11-24', '2022-12-25', '2022-12-31', '2023-01-01', '2023-07-04',
+            '2023-09-04', '2023-11-23', '2023-12-25', '2023-12-31', '2024-01-01',
+            '2024-07-04', '2024-09-02', '2024-11-28', '2024-12-25', '2024-12-31'
+        ]
+        return 1 if date in holidays else 0
+
+    def _get_historical_delay(self, airline: str, origin: str) -> float:
+        """
+        Get historical average delay for a specific airline and origin airport.
+        
+        Args:
+            airline (str): Airline name
+            origin (str): Origin airport code
+            
+        Returns:
+            float: Historical average delay
+        """
+        if self.original_flight_dataset is None:
+            self.logger.warning("No flight dataset available for historical delay calculation")
+            return 0.0
+            
+        # Filter data for specific airline and origin
+        mask = (self.original_flight_dataset['AIRLINE'] == airline) & \
+               (self.original_flight_dataset['ORIGIN'] == origin)
+        
+        filtered_data = self.original_flight_dataset[mask]
+        
+        if filtered_data.empty:
+            self.logger.warning(f"No historical data found for {airline} at {origin}")
+            return 0.0
+            
+        # Calculate average delay from all delay columns
+        delay_columns = [
+            'DELAY_DUE_CARRIER', 'DELAY_DUE_WEATHER', 
+            'DELAY_DUE_NAS', 'DELAY_DUE_SECURITY', 
+            'DELAY_DUE_LATE_AIRCRAFT'
+        ]
+        
+        historical_delay = filtered_data[delay_columns].mean().mean()
+        self.logger.debug(f"Historical delay for {airline} at {origin}: {historical_delay:.2f}")
+        
+        return historical_delay

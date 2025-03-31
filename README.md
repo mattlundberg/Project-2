@@ -60,6 +60,9 @@ This program is a flight delay prediction system that uses machine learning to f
 - Python 3.11+
 
 ### Required Libraries/Dependencies
+
+To install required files us the command 'pip install -r requirements.txt'
+
 All dependencies are listed in requirements.txt and include:
 - pandas>=2.1.0 - Data manipulation and analysis
 - numpy>=1.24.0 - Numerical computing
