@@ -313,7 +313,7 @@ class ModelHelper:
             'ORIGIN': [origin], 
             'DAY_OF_YEAR': [day_of_year],
             'TOTAL_DELAY': [total_delay],
-            'DELAY_VARIANCE': [-20.0], # Set to 0 for single prediction
+            'DELAY_VARIANCE': [-20.0], 
             'HISTORICAL_DELAY': [self._get_historical_delay(airline, origin)]
         })
         
