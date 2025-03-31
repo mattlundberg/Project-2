@@ -69,7 +69,7 @@ class ModelHelper:
                     min_samples_split=50,
                     min_samples_leaf=20,
                     max_features='sqrt',
-                    class_weight='balanced',
+                    class_weight='balanced_subsample',
                     bootstrap=True,
                     oob_score=True,
                     n_jobs=-1
@@ -196,7 +196,7 @@ class ModelHelper:
         
         # Calculate various delay statistics
         df['TOTAL_DELAY'] = df[delay_columns].sum(axis=1)
-        df['MAX_DELAY'] = df[delay_columns].max(axis=1)
+        #df['MAX_DELAY'] = df[delay_columns].max(axis=1)
         df['DELAY_VARIANCE'] = df[delay_columns].var(axis=1)
         
         # Calculate historical delay patterns
@@ -239,6 +239,14 @@ class ModelHelper:
         
         self.logger.info("Handling class imbalance...")
         df = self._balance_dataset(df, 'DELAY_CATEGORY')
+        
+        # After preparing the dataset
+        class_distribution = df['DELAY_CATEGORY'].value_counts()
+        self.logger.info(f"Class distribution before balancing:\n{class_distribution}")
+
+        # After balancing
+        if hasattr(self.model, 'classes_'):
+            self.logger.info("Model classes:", self.model.classes_)
         
         df = self._drop_unnecessary_columns(df)
         self.flight_dataset = df
@@ -305,8 +313,7 @@ class ModelHelper:
             'ORIGIN': [origin], 
             'DAY_OF_YEAR': [day_of_year],
             'TOTAL_DELAY': [total_delay],
-            'MAX_DELAY': [total_delay], # Using total_delay as max since it's a single value
-            'DELAY_VARIANCE': [0.0], # Set to 0 for single prediction
+            'DELAY_VARIANCE': [-20.0], # Set to 0 for single prediction
             'HISTORICAL_DELAY': [self._get_historical_delay(airline, origin)]
         })
         
@@ -339,6 +346,11 @@ class ModelHelper:
         # Convert numeric prediction to category
         if 'DELAY_CATEGORY' in self.label_encoders:
             prediction = self.label_encoders['DELAY_CATEGORY'].inverse_transform([prediction])[0]
+        
+        # Before returning prediction
+        if hasattr(self.model, 'predict_proba'):
+            probabilities = self.model.predict_proba(input_data)
+            self.logger.info(f"Prediction probabilities: {dict(zip(self.model.classes_, probabilities[0]))}")
         
         return prediction
 
