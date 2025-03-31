@@ -2,26 +2,22 @@
 import os
 import logging
 import pickle
-import warnings
-from typing import Union, Tuple, Optional, Dict, Any, List
+from typing import Union, Tuple, Dict, Any
 
 # Third-party imports
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import kagglehub
 import kagglehub.auth
 from dotenv import load_dotenv
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
-from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.svm import SVC, SVR
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    mean_squared_error, r2_score
+    accuracy_score, precision_score, recall_score, f1_score
 )
 
 # Configure logging
@@ -29,7 +25,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-DEFAULT_RANDOM_STATE = 42
+DEFAULT_RANDOM_STATE = 32
 CUTOFF_DATE = '2021-06-15'
 DELAY_BINS = [-np.inf, -15, 15, np.inf]
 DELAY_LABELS = ['Early', 'On Time', 'Delayed']
@@ -56,8 +52,6 @@ class ModelHelper:
         self.has_flight_dataset = False
         self.logger = logger
         self.model = None
-        self.airlinedelay = None
-        self.airportdelay = None
         self.xdata = None
         self.ydata = None
 
@@ -171,11 +165,20 @@ class ModelHelper:
         return pd.concat(balanced_dfs)
 
     def _prepare_features(self, df: pd.DataFrame, target_column: str) -> pd.DataFrame:
-        """Prepare features for modeling."""
-        # Create time-based features
-        df['DAY_OF_WEEK'] = pd.to_datetime(df['FL_DATE']).dt.dayofweek
+        """
+        Prepare features for modeling by creating time-based features and delay categories.
         
-        # Create delay categories
+        Args:
+            df (pd.DataFrame): Input DataFrame containing flight data
+            target_column (str): Name of the target column for prediction
+            
+        Returns:
+            pd.DataFrame: DataFrame with engineered features
+        """
+        # Extract day of year from flight date for temporal patterns
+        df['DAY_OF_YEAR'] = pd.to_datetime(df['FL_DATE']).dt.dayofyear
+        
+        # Categorize delays into Early/On Time/Delayed using predefined bins
         df['DELAY_CATEGORY'] = pd.cut(
             df['DEP_DELAY'], 
             bins=DELAY_BINS,
@@ -208,29 +211,12 @@ class ModelHelper:
         ]
         return df.drop(columns=[col for col in columns_to_drop if col in df.columns])
 
-    def _calculate_delay_statistics(self, df: pd.DataFrame) -> None:
-        """
-        Calculate and store mean delay statistics by airline and origin airport.
-        
-        Args:
-            df (pd.DataFrame): Input dataframe containing flight data
-        """
-        # Calculate mean delay by airline
-        self.airlinedelay = df.groupby('AIRLINE')['DEP_DELAY'].mean().to_dict()
-        self.logger.info(f"Calculated mean delays for {len(self.airlinedelay)} airlines")
-        
-        # Calculate mean delay by origin airport
-        self.airportdelay = df.groupby('ORIGIN')['DEP_DELAY'].mean().to_dict()
-        self.logger.info(f"Calculated mean delays for {len(self.airportdelay)} airports")
-
+    
     def prepare_flight_dataset(self, df: pd.DataFrame) -> pd.DataFrame:
         """Prepare the flight dataset for modeling."""
 
         self.logger.info("Optimizing flight dataset data types...")
         df = self._optimize_flight_dataset_dtypes(df)
-
-        self.logger.info("Calculating delay statistics...")
-        self._calculate_delay_statistics(df)
         
         self.logger.info("Performing feature engineering...")
         df = self._prepare_features(df, 'DELAY_CATEGORY')
@@ -244,8 +230,15 @@ class ModelHelper:
         return df
 
     def train_model(self, X_train: Union[pd.DataFrame, np.ndarray], y_train: pd.Series,
-                   model_type: str = 'random_forest', task: str = 'classification') -> Any:
+                   model_type: str = 'random_forest', task: str = 'classification', force_train: bool = False) -> Any:
         """Train a specified model on the prepared data."""
+
+        #Check to see if there is a model already trained and loaded.
+        self.model = self.load_model(f"{model_type}_flight_delay_model")
+        if self.model is not None and not force_train:
+            self.logger.info(f"Model {model_type} already trained and loaded. Using the loaded model...")
+            return self.model
+
         models = self._get_model_config(model_type, task)
         
         if model_type not in models:
@@ -271,7 +264,7 @@ class ModelHelper:
         
         Args:
             airline (str): Airline name
-            departure_date (str): Date of departure
+            departure_date (str): Date of departure in yyyy-mm-dd format
             origin (str): Origin airport code
             
         Returns:
@@ -279,19 +272,19 @@ class ModelHelper:
         """
         if self.model is None:
             raise ValueError("No model has been trained or loaded. Please train or load a model first.")
-        # Get airline and airport delay statistics
-        airline_delay = self.airlinedelay.get(airline, 0)
-        airport_delay = self.airportdelay.get(origin, 0)
         
-        # Calculate average delay
-        total_delay = np.mean([airline_delay, airport_delay])
-        self.logger.info(f"Airline delay: {airline} {airline_delay}, Airport delay: {origin} {airport_delay}, Total delay: {total_delay}")
-        
+        # Convert departure date to day of year
+        day_of_year = pd.to_datetime(departure_date).dayofyear
+
+        # Calculate total delay
+        total_delay = self._calculate_total_delay_by_day(day_of_year)
+        self.logger.info(f"Airline: {airline}, Airport: {origin}, Total delay: {total_delay}")
+
         # Create input data
         input_data = pd.DataFrame({
             'AIRLINE': [airline],
             'ORIGIN': [origin],
-            'DAY_OF_WEEK': [pd.to_datetime(departure_date).dayofweek],
+            'DAY_OF_YEAR': [day_of_year],
             'TOTAL_DELAY': [total_delay]
         })
         
@@ -386,23 +379,28 @@ class ModelHelper:
         Args:
             model (Any): Trained model object to save
             model_name (str): Name to give the saved model file
+            
+        Raises:
+            Exception: If there is an error saving the model
         """
         import os
+        
+        # Ensure model name has .pkl extension
+        model_name = f"{model_name}.pkl" if not model_name.endswith('.pkl') else model_name
+        
+        # Construct full path to save model
+        model_path = os.path.join('models', model_name)
         
         # Create models directory if it doesn't exist
         os.makedirs('models', exist_ok=True)
         
-        # Add .pkl extension if not provided
-        if not model_name.endswith('.pkl'):
-            model_name += '.pkl'
-            
-        model_path = os.path.join('models', model_name)
-        
         try:
-            with open(model_path, 'wb') as f:
-                pickle.dump(model, f)
+            # Save model using pickle serialization
+            with open(model_path, 'wb') as model_file:
+                pickle.dump(model, model_file)
             self.logger.info(f"Model successfully saved to {model_path}")
         except Exception as e:
+            # Log and re-raise any errors that occur during saving
             self.logger.error(f"Error saving model to {model_path}: {str(e)}")
             raise
 
@@ -415,76 +413,153 @@ class ModelHelper:
             
         Returns:
             Any: Loaded model object
-        """ 
-        import os
-
-        # Create models directory if it doesn't exist
-        os.makedirs('models', exist_ok=True)    
-
-        # Add .pkl extension if not provided
-        if not model_name.endswith('.pkl'):
-            model_name += '.pkl'
-
-        model_path = os.path.join('models', model_name) 
-
-        try:
-            with open(model_path, 'rb') as f:
-                model = pickle.load(f)
-            self.logger.info(f"Model successfully loaded from {model_path}")
-            return model        
-        except Exception as e:
-            self.logger.error(f"Error loading model from {model_path}: {str(e)}")
-            raise  
-
-    def fetch_flight_dataset(self) -> pd.DataFrame:
+            
+        Raises:
+            FileNotFoundError: If model file cannot be found
+            pickle.UnpicklingError: If model file is corrupted
         """
-        Fetch flight dataset from Kaggle using kagglehub.
+        import os
+        
+        # Ensure model name has .pkl extension by appending if needed
+        model_name = f"{model_name}.pkl" if not model_name.endswith('.pkl') else model_name
+        
+        # Construct full path to model file in models directory
+        model_path = os.path.join('models', model_name)
+        
+        # Create models directory if it doesn't exist yet
+        # exist_ok=True prevents errors if directory already exists
+        os.makedirs('models', exist_ok=True)
+        
+        try:
+            # Open model file in binary read mode and deserialize using pickle
+            with open(model_path, 'rb') as model_file:
+                # Load the model object from the file
+                model = pickle.load(model_file)
+                # Log successful load
+                self.logger.info(f"Model successfully loaded from {model_path}")
+                return model
+                
+        except FileNotFoundError:
+            # Handle case where model file doesn't exist
+            self.logger.error(f"Model file not found at {model_path}")
+            raise
+        except pickle.UnpicklingError as e:
+            # Handle corrupted or invalid pickle file
+            self.logger.error(f"Error unpickling model from {model_path}: {str(e)}")
+            raise
+        except Exception as e:
+            # Catch any other unexpected errors
+            self.logger.error(f"Unexpected error loading model from {model_path}: {str(e)}")
+            raise
+
+    def fetch_flight_dataset(self, force_fetch: bool = False) -> pd.DataFrame:
+        """
+        Fetch flight dataset from Kaggle using kagglehub and prepare it for modeling.
         
         Returns:
-            pd.DataFrame: Loaded dataset
+            pd.DataFrame: Loaded and prepared dataset
+            
+        Flow:
+        1. Check if dataset is already cached in memory
+        2. If not cached, fetch from Kaggle and prepare it
+        3. Store both original and prepared versions
+        4. Return the prepared dataset
         """
-
-        if self.flight_dataset is not None:
-            self.logger.info("Flight dataset is already loaded and optimized")
+        # First check if we already have the dataset loaded in memory or on the computer
+        # This prevents unnecessary re-downloading and processing
+        if self.flight_dataset is not None and not force_fetch:
+            self.logger.info("Using cached flight dataset")
             return self.flight_dataset
         
-        df = self.flight_dataset
+        #check if the dataset is already saved on the computer
+        if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'flight_dataset.csv')) and not force_fetch:
+            self.logger.info("Using saved flight dataset")
+            self.flight_dataset = pd.read_csv(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'flight_dataset.csv'))
+            return self.flight_dataset.copy()
+        
+        if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'flight_dataset_original.csv')) and not force_fetch:
+            self.logger.info("Using saved flight dataset")
+            self.original_flight_dataset = pd.read_csv(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'flight_dataset_original.csv'))
+            df = self.original_flight_dataset.copy()
 
-        if not self.has_flight_dataset:
-            print("Fetching flight dataset from Kaggle...")
-            df = self.fetch_dataset(os.environ['KAGGLE_FLIGHT_FILE_PATH'], os.environ['KAGGLE_FLIGHT_FILE_NAME'])
-            print("Preparing flight dataset...")
+
+        # Only fetch and prepare if we haven't done so already
+        # This is tracked by the has_flight_dataset flag
+        if not self.has_flight_dataset or force_fetch:
+            self.logger.info("Fetching flight dataset...")
+            
+            if self.original_flight_dataset is None:
+                # Get dataset from Kaggle using environment variables for path/filename
+                df = self.fetch_dataset(
+                    os.environ['KAGGLE_FLIGHT_FILE_PATH'],
+                    os.environ['KAGGLE_FLIGHT_FILE_NAME']
+                )
+            else:
+                df = self.original_flight_dataset.copy()
+            
+            self.logger.info("Preparing flight dataset...")
+            # Store original version before any preprocessing
             self.original_flight_dataset = df.copy()
-            df_optmized = self.prepare_flight_dataset(df)
+            # Process the dataset using prepare_flight_dataset method
+            prepared_df = self.prepare_flight_dataset(df)
+            
+            # Cache both the prepared dataset and set flag
+            self.flight_dataset = prepared_df
             self.has_flight_dataset = True
 
-        self.flight_dataset = df
-
+        # Final validation check - dataset should never be None at this point
+        # If it is, something went wrong in the fetch/prepare process
         if self.flight_dataset is None:
-            raise ValueError("Flight dataset not found.")
+            raise ValueError("Failed to load flight dataset")
         
-        return df_optmized
+        # Save the flight dataset to a CSV file in the resources folder
+        resources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources')
+        os.makedirs(resources_dir, exist_ok=True)
+        
+        csv_path = os.path.join(resources_dir, 'flight_dataset.csv')
+        csv_path_original = os.path.join(resources_dir, 'flight_dataset_original.csv')
+        self.logger.info(f"Saving flight dataset to {csv_path}")
+        
+        try:
+            self.original_flight_dataset.to_csv(csv_path_original, index=False)
+            self.flight_dataset.to_csv(csv_path, index=False)
+            self.logger.info("Successfully saved flight dataset")
+        except Exception as e:
+            self.logger.error(f"Error saving flight dataset: {str(e)}")
+            # Continue execution even if save fails
+
+        return self.flight_dataset.copy()
 
     def fetch_dataset(self, file_path: str, file_name: str) -> pd.DataFrame:
         """
         Fetch dataset from Kaggle using kagglehub.
         
+        Args:
+            file_path (str): Path to the Kaggle dataset
+            file_name (str): Name of the file to download
+            
         Returns:
             pd.DataFrame: Loaded dataset
+            
+        Raises:
+            FileNotFoundError: If dataset cannot be found or downloaded
+            pd.errors.EmptyDataError: If the CSV file is empty
         """
-        # Load environment variables
         load_dotenv()
         
-        # Download latest version
-        path = kagglehub.dataset_download(
-            file_path
-        )
-        path = path + '/' + file_name
+        try:
+            # Download dataset and construct full path
+            download_path = kagglehub.dataset_download(file_path)
+            full_path = os.path.join(download_path, file_name)
+            
+            # Load and return the dataset
+            return pd.read_csv(full_path, engine='python')
+            
+        except Exception as e:
+            self.logger.error(f"Error fetching dataset: {str(e)}")
+            raise
 
-        # Load dataset
-        return pd.read_csv(path, engine='python')    
-
-    def train_flight_delay_model(self, model_type: str = 'logistic_regression', test_size: float = 0.2) -> Tuple[Any, Dict[str, float]]:
+    def train_flight_delay_model(self, model_type: str = 'logistic_regression', test_size: float = 0.2, force_train: bool = False, force_fetch: bool = False) -> Tuple[Any, Dict[str, float]]:
         """
         Orchestrate the complete process of retrieving data and training a flight delay prediction model.
         """
@@ -493,7 +568,7 @@ class ModelHelper:
         if self.flight_dataset is None:
             # Step 1: Fetch and prepare the dataset
             self.logger.info("Step 1: Fetching and preparing the dataset...")
-            df = self.fetch_flight_dataset()
+            df = self.fetch_flight_dataset(force_fetch)
             self.logger.info(f"Dataset shape: {df.shape}")
             
             # Step 2: Prepare features and target
@@ -510,7 +585,7 @@ class ModelHelper:
         
         # Log original features for reference
         self.logger.info(f"Features being used: {self.xdata.columns.tolist()}")
-        
+
         # Step 3: Split the data
         self.logger.info(f"Step 3: Splitting data into train/test sets (test_size={test_size})...")
         X_train, X_test, y_train, y_test = train_test_split(
@@ -529,10 +604,10 @@ class ModelHelper:
         if model_type == 'logistic_regression':
             X_train_processed = self.scaler.fit_transform(X_train_processed)
             X_test_processed = self.scaler.transform(X_test_processed)
-        
+
         # Step 5: Train the model
         self.logger.info(f"Step 5: Training {model_type} model...")
-        model = self.train_model(X_train_processed, y_train, model_type=model_type)
+        model = self.train_model(X_train_processed, y_train, model_type=model_type, force_train=force_train)
         self.model = model
         
         # Step 6: Evaluate the model
@@ -556,3 +631,42 @@ class ModelHelper:
         
         self.logger.info("\nModel training process completed successfully!")
         return model, metrics    
+        
+    def _calculate_total_delay_by_day(self, day_of_year: int) -> float:
+        """
+        Calculate the mean total delay for a given day of the year from historical data.
+        
+        Args:
+            day_of_year (int): Day of year (1-366)
+            
+        Returns:
+            float: Mean total delay for that day of year
+        """
+        if self.original_flight_dataset is None:
+            self.logger.warning("No flight dataset available for delay calculation")
+            return 0.0
+            
+        # Convert FL_DATE to day of year
+        df = self.original_flight_dataset.copy()
+        df['DAY_OF_YEAR'] = pd.to_datetime(df['FL_DATE']).dt.dayofyear
+        
+        # Filter for the specific day
+        day_data = df[df['DAY_OF_YEAR'] == day_of_year]
+        
+        if day_data.empty:
+            self.logger.warning(f"No historical data found for day {day_of_year}")
+            return 0.0
+        
+        # Calculate mean of delay columns for that day
+        delay_columns = [
+            'DELAY_DUE_CARRIER', 'DELAY_DUE_WEATHER', 
+            'DELAY_DUE_NAS', 'DELAY_DUE_SECURITY', 
+            'DELAY_DUE_LATE_AIRCRAFT'
+        ]
+        
+        total_delay = day_data[delay_columns].mean().mean()
+        
+        self.logger.debug(f"Calculated total delay for day {day_of_year}: {total_delay:.2f}")
+        return total_delay
+
+    
