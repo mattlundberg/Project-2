@@ -80,7 +80,3 @@ All dependencies are listed in requirements.txt and include:
 - Git for version control
 - Virtual environment (recommended)
 - Jupyter notebooks for analysis and visualization
-
-### Project Structure
-TBD
-
