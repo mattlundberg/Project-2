@@ -4,6 +4,7 @@ from tkcalendar import DateEntry
 import pandas as pd
 from datetime import datetime
 from modelhelper import ModelHelper
+from typing import Union, Tuple, Dict, Any
 
 ## Initialize ModelHelper and train the model
 print("Loading Model")
@@ -58,12 +59,13 @@ def display_sequential_messages(airline, departure_date, origin):
 
     def display_results():
         # Call the prepare_and_predict function and show the results
-        prediction = prepare_and_predict(airline, origin, departure_date)
-        prediction_label.config(text=f"Your flight is likely to be: \n{prediction.capitalize()}")
+        result = prepare_and_predict(airline, origin, departure_date)
+        prediction_label.config(text=f"Your flight is likely to be: \n{result['prediction'].capitalize()}\n\n")
+        probability_label.config(text=f"Probability:\n {result['probabilities']}\n\n")
 
     show_message("Inputting Airline...", input_departure_date)
 
-def prepare_and_predict(airline, origin, departure_date):
+def prepare_and_predict(airline, origin, departure_date)-> Dict[str, Any]:
     # Get selected model type
     model_type = model_combobox.get()
     
@@ -133,13 +135,15 @@ ttk.Button(root, text="Predict Flight", command=predict_flight).grid(row=4, colu
 # Results Display
 prediction_label = tk.Label(root, text="", font=("Arial", 10, "bold"))
 prediction_label.grid(row=5, column=0, columnspan=2, pady=(10))
+probability_label = tk.Label(root, text="", font=("Arial", 8))
+probability_label.grid(row=6, column=0, columnspan=2, pady=(10)) 
 
 # Model Information Display
 model_info_header_label = ttk.Label(root, text="Model Information:", font=("Arial", 10))
-model_info_header_label.grid(row=6, column=0, columnspan=2, padx=5, pady=(10, 0))
+model_info_header_label.grid(row=7, column=0, columnspan=2, padx=5, pady=(10, 0))
 
 model_info_label = tk.Label(root, text="", wraplength=400, justify="left")
-model_info_label.grid(row=7, column=0, columnspan=2, padx=(10,0), pady=(0, 10), sticky="w")
+model_info_label.grid(row=8, column=0, columnspan=2, padx=(10,0), pady=(0, 10), sticky="w")
 
 # Initialize model info display
 update_model_info()
