@@ -83,13 +83,21 @@ All dependencies are listed in requirements.txt and include:
 
 ### Model Results
 - Random Forest:
-Accuracy: 0.7708
-Precision: 0.7877
-Recall: 0.7708
-F1: 0.7749
+
+    Accuracy: 0.7708
+
+    Precision: 0.7877
+
+    Recall: 0.7708
+
+    F1: 0.7749
 
 - Logistic Regression:
-Accuracy: 0.6709
-Precision: 0.6843
-Recall: 0.6709
-F1: 0.6758
+
+    Accuracy: 0.6709
+
+    Precision: 0.6843
+
+    Recall: 0.6709
+
+    F1: 0.6758
