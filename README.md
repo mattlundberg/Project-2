@@ -21,7 +21,7 @@ Join our Slack channel for project discussions and updates:
 | Model Selection | 3/25/25 | Complete |
 | Model/UI Connection | 3/25/25 | Complete |
 | Testing | Ad Hoc | Complete |
-| Finalize Documentation | 3/27/25 | In Progress |
+| Finalize Documentation | 3/27/25 | Complete |
 | Create Presentation | 3/27/25 | Complete |
 
 ## Proposal
@@ -73,6 +73,7 @@ All dependencies are listed in requirements.txt and include:
 - kagglehub[pandas-datasets]>=0.1.0 - Kaggle dataset access
 - python-dotenv>=1.0.0 - Environment variable management
 - pytest>=7.4.0 - Testing framework
+- tkinter>=8.6.0, tkcalendar>=1.6.0 - GUI development and calendar widget 
 
 ### Development Environment
 - Python 3.11+
