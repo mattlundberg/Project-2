@@ -80,3 +80,16 @@ All dependencies are listed in requirements.txt and include:
 - Git for version control
 - Virtual environment (recommended)
 - Jupyter notebooks for analysis and visualization
+
+### Model Results
+- Random Forest:
+Accuracy: 0.7708
+Precision: 0.7877
+Recall: 0.7708
+F1: 0.7749
+
+- Logistic Regression:
+Accuracy: 0.6709
+Precision: 0.6843
+Recall: 0.6709
+F1: 0.6758
