@@ -282,7 +282,7 @@ class ModelHelper:
         model.fit(X_train, y_train)
         return model
 
-    def predict(self, airline: str, departure_date: str, origin: str) -> str:
+    def predict(self, airline: str, departure_date: str, origin: str) -> Dict[str, Any]:
         """
         Make predictions for a specific flight.
         
@@ -292,7 +292,10 @@ class ModelHelper:
             origin (str): Origin airport code
             
         Returns:
-            str: Predicted delay category ('Early', 'On Time', or 'Delayed')
+            Dict[str, Any]: Dictionary containing:
+                - prediction: Predicted delay category ('Early', 'On Time', or 'Delayed')
+                - probabilities: Dictionary of probabilities for each class
+                - features: Dictionary of input features used for prediction
         """
         if self.model is None:
             raise ValueError("No model has been trained or loaded. Please train or load a model first.")
@@ -303,17 +306,16 @@ class ModelHelper:
         # Calculate total delay
         total_delay = self._calculate_total_delay_by_day(day_of_year, airline, origin)
         
-        #Log to see the values
+        # Log to see the values
         self.logger.info(f"Airline: {airline}, Airport: {origin}, Total delay: {total_delay}")
 
-        # Create input data with all features in the same order as training
         # Create input data with all required features
         input_data = pd.DataFrame({
             'AIRLINE': [airline],
             'ORIGIN': [origin], 
             'DAY_OF_YEAR': [day_of_year],
             'TOTAL_DELAY': [total_delay],
-            'DELAY_VARIANCE': [-20.0], 
+            'DELAY_VARIANCE': [-20.0],  # Set to 0 for single prediction
             'HISTORICAL_DELAY': [self._get_historical_delay(airline, origin)]
         })
         
@@ -331,7 +333,7 @@ class ModelHelper:
                     input_data[col] = 0
         
         # Handle NaN values
-        input_data = input_data.fillna(0)  # Fill NaN with 0 for numerical features
+        input_data = input_data.fillna(0)
         
         # Scale numerical features only for logistic regression
         if isinstance(self.model, LogisticRegression):
@@ -343,16 +345,20 @@ class ModelHelper:
         # Make prediction
         prediction = self.model.predict(input_data)[0]
         
+        # Get prediction probabilities if available
+        probabilities = {}
+        if hasattr(self.model, 'predict_proba'):
+            proba = self.model.predict_proba(input_data)[0]
+            probabilities = dict(zip(self.model.classes_, proba))
+        
         # Convert numeric prediction to category
         if 'DELAY_CATEGORY' in self.label_encoders:
             prediction = self.label_encoders['DELAY_CATEGORY'].inverse_transform([prediction])[0]
         
-        # Before returning prediction
-        if hasattr(self.model, 'predict_proba'):
-            probabilities = self.model.predict_proba(input_data)
-            self.logger.info(f"Prediction probabilities: {dict(zip(self.model.classes_, probabilities[0]))}")
-        
-        return prediction
+        return {
+            'prediction': prediction,
+            'probabilities': probabilities
+        }
 
     def _optimize_flight_dataset_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
         """
