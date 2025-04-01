@@ -357,7 +357,7 @@ class ModelHelper:
         
         return {
             'prediction': prediction,
-            'probabilities': probabilities
+            'probabilities': ', '.join(f'{k}: {v*100:.2f}%' for k,v in probabilities.items())
         }
 
     def _optimize_flight_dataset_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
